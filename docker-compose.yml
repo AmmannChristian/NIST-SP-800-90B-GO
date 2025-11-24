@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # NIST 800-90B Entropy Assessment Service
+  nist-entropy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nist-entropy-service
+    ports:
+      - "50051:50051"  # gRPC
+      - "9090:9090"    # Metrics & Health
+    environment:
+      - GRPC_PORT=50051
+      - METRICS_PORT=9090
+      - LOG_LEVEL=info
+      - MAX_SAMPLE_SIZE=1000000
+      - MIN_SAMPLE_SIZE=1000
+    restart: unless-stopped
+    networks:
+      - nist-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nist-prometheus
+    ports:
+      - "9092:9090"
+    volumes:
+      - ./deployments/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+    restart: unless-stopped
+    networks:
+      - nist-network
+    depends_on:
+      - nist-entropy
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nist-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployments/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./deployments/grafana/datasources:/etc/grafana/provisioning/datasources
+    restart: unless-stopped
+    networks:
+      - nist-network
+    depends_on:
+      - prometheus
+
+networks:
+  nist-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

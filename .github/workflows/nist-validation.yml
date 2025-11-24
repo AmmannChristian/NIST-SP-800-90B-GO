@@ -1,0 +1,146 @@
+name: NIST Scientific Validation
+
+on:
+  workflow_dispatch:  # Only run manually for NIST reference comparison
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install C++ Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          g++ \
+          make \
+          libbz2-dev \
+          libdivsufsort-dev \
+          libjsoncpp-dev \
+          libmpfr-dev \
+          libgmp-dev \
+          libssl-dev
+
+    - name: Build NIST C++ Library
+      run: make build-nist
+
+    - name: Download Go dependencies
+      run: go mod download
+
+    - name: Build Original NIST C++ Tools
+      run: |
+        cd internal/nist/cpp
+        echo "Building original NIST entropy assessment tools..."
+        make iid non_iid
+        echo "Original NIST tools built successfully"
+        ls -lh ea_iid ea_non_iid
+
+    - name: Prepare Test Data
+      run: |
+        echo "Copying NIST selftest data to testdata..."
+        mkdir -p testdata/selftest
+        if [ -d "internal/nist/cpp/selftest/data" ]; then
+          cp internal/nist/cpp/selftest/data/*.bin testdata/selftest/ || true
+        fi
+        ls -lh testdata/selftest/ || echo "No test data found"
+
+    - name: Generate Reference Outputs from NIST C++
+      run: |
+        cd internal/nist/cpp
+        DATASETS=($(ls selftest/data/*.bin 2>/dev/null || echo ""))
+        
+        if [ ${#DATASETS[@]} -eq 0 ]; then
+          echo "No test datasets found, skipping reference generation"
+          exit 0
+        fi
+        
+        for dataset in "${DATASETS[@]}"; do
+          base=$(basename "$dataset" .bin)
+          echo "Running NIST C++ on $base..."
+          
+          # Run Non-IID assessment
+          ./ea_non_iid -v "$dataset" 8 > "/tmp/nist_noniid_${base}.out" 2>&1 || true
+          
+          # Run IID assessment
+          ./ea_iid -v "$dataset" 8 > "/tmp/nist_iid_${base}.out" 2>&1 || true
+          
+          echo "  Results saved for $base"
+        done
+        
+        echo "Reference generation complete"
+        ls -lh /tmp/nist_*.out 2>/dev/null || echo "No reference files generated"
+
+    - name: Build Go Binaries
+      run: make build
+
+    - name: Run Go Implementation
+      run: |
+        DATASETS=($(ls testdata/selftest/*.bin 2>/dev/null || echo ""))
+        
+        if [ ${#DATASETS[@]} -eq 0 ]; then
+          echo "No test datasets found, skipping Go tests"
+          exit 0
+        fi
+        
+        for dataset in "${DATASETS[@]}"; do
+          base=$(basename "$dataset" .bin)
+          echo "Running Go implementation on $base..."
+          
+          # Non-IID
+          ./build/ea_tool -non-iid -bits 8 "$dataset" -output "/tmp/go_noniid_${base}.json" || true
+          
+          # IID
+          ./build/ea_tool -iid -bits 8 "$dataset" -output "/tmp/go_iid_${base}.json" || true
+        done
+
+    - name: Compare Results
+      id: compare
+      run: |
+        echo "## NIST Scientific Validation Results" > $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Count files
+        NIST_FILES=$(ls /tmp/nist_*.out 2>/dev/null | wc -l)
+        GO_FILES=$(ls /tmp/go_*.json 2>/dev/null | wc -l)
+        
+        echo "**NIST C++ outputs:** $NIST_FILES" >> $GITHUB_STEP_SUMMARY
+        echo "**Go outputs:** $GO_FILES" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ $NIST_FILES -eq 0 ] || [ $GO_FILES -eq 0 ]; then
+          echo "### Status: No Comparison Possible" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Insufficient test data or outputs generated." >> $GITHUB_STEP_SUMMARY
+          echo "status=incomplete" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        
+        echo "### Validation: Manual Review Required" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Output files have been generated. Automated comparison script to be implemented." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+        echo "1. Implement \`tools/validate_nist_cpp_vs_go.sh\`" >> $GITHUB_STEP_SUMMARY
+        echo "2. Parse NIST C++ output format" >> $GITHUB_STEP_SUMMARY
+        echo "3. Compare entropy values (tolerance: 1e-6)" >> $GITHUB_STEP_SUMMARY
+        echo "4. Generate detailed comparison report" >> $GITHUB_STEP_SUMMARY
+        
+        echo "status=manual_review" >> "$GITHUB_OUTPUT"
+
+    - name: Upload Test Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: validation-results
+        path: |
+          /tmp/nist_*.out
+          /tmp/go_*.json
+        retention-days: 30
+        if-no-files-found: warn

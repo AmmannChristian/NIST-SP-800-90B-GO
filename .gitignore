@@ -1,0 +1,49 @@
+# Binaries
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+server
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# C++ build artifacts
+internal/nist/lib/
+internal/nist/**/*.o
+internal/nist/**/*.a
+internal/nist/wrapper/*.o
+*.o
+*.a
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Build artifacts
+obj/
+assess
+libnist.a
+experiments/
+
+# Logs
+*.log
+build
+.env
+.cache

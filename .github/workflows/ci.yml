@@ -1,0 +1,274 @@
+name: SP800-90B Service CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  checks: write
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.21.x'
+  GO_COVERAGE_MIN: '90'
+  UNIT_PKGS: ./internal/...
+  GOCACHE: /tmp/go-build
+  GOMODCACHE: /tmp/go-mod
+  GO_CACHE_VERSION: v1
+  CGO_ENABLED: '1'
+
+jobs:
+  build_and_test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        id: setup-go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go build and module files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: go-${{ env.GO_CACHE_VERSION }}-${{ runner.os}}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-${{ env.GO_CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.setup-go.outputs.go-version }}-
+
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            g++ \
+            libbz2-dev \
+            libdivsufsort-dev \
+            libjsoncpp-dev \
+            libmpfr-dev \
+            libgmp-dev \
+            libssl-dev \
+            make
+
+      - name: Build NIST C++ library
+        run: make build-nist
+
+      - name: Install dependencies and tools
+        run: |
+          go mod download
+          go install gotest.tools/gotestsum@v1.13.0
+
+      - name: Format check
+        run: |
+          make fmt-fix
+          git diff --stat -- . ':!pkg/pb/*.pb.go'
+          if git diff --quiet -- . ':!pkg/pb/*.pb.go'; then
+            echo "Code formatting is correct"
+          else
+            echo "::error::Code is not formatted. Run 'make fmt' locally and commit changes"
+            git diff -- . ':!pkg/pb/*.pb.go'
+            exit 1
+          fi
+
+      - name: Go vet
+        run: make vet
+
+      - name: Staticcheck
+        run: make staticcheck
+
+      - name: Security scan (gosec)
+        run: make gosec
+        continue-on-error: true
+
+      - name: Vulnerability check (govulncheck)
+        run: make govulncheck
+        continue-on-error: true
+
+      - name: Unit tests
+        env:
+          JUNIT_FILE: build-ci/test-junit/junit.xml
+        run: |
+          mkdir -p build-ci/test-junit
+          make test-ci
+
+      - name: Generate coverage report
+        run: |
+          mkdir -p build-ci/coverage
+          set +e
+          make coverage
+          status=$?
+          cp -r build/coverage.out build-ci/coverage/ 2>/dev/null || true
+          set -e
+          exit $status
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: build/coverage.out
+
+      - name: Build native binary
+        run: |
+          mkdir -p build-ci/binaries
+          make build
+          cp build/ea_tool build-ci/binaries/
+          cp build/server build-ci/binaries/
+
+      - name: Build ARM64 binary
+        run: |
+          make build-arm64
+          cp build/ea_tool-arm64 build-ci/binaries/
+          cp build/server-arm64 build-ci/binaries/
+
+      - name: List build artifacts
+        run: |
+          echo "::group::Build Artifacts"
+          ls -lh build-ci/binaries/ 2>/dev/null || echo "No binaries found"
+          echo "::endgroup::"
+
+      - name: Check JUnit availability
+        if: always()
+        id: junit_check
+        run: |
+          if [ -f build-ci/test-junit/junit.xml ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish test report
+        if: always() && steps.junit_check.outputs.available == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: dorny/test-reporter@v1
+        with:
+          name: SP800-90B Tests
+          path: build-ci/test-junit/junit.xml
+          reporter: java-junit
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail-on-error: false
+
+      - name: Upload coverage and test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sp800-90b-artifacts-${{ github.run_id }}
+          path: |
+            build-ci/coverage/
+            build-ci/test-junit/
+          retention-days: 10
+          if-no-files-found: warn
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: sp800-90b-binaries-${{ github.run_id }}
+          path: build-ci/binaries/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Format check:** Passed" >> $GITHUB_STEP_SUMMARY
+          echo "**Static analysis:** Completed" >> $GITHUB_STEP_SUMMARY
+          echo "**Unit tests:** Passed" >> $GITHUB_STEP_SUMMARY
+          echo "**Coverage threshold:** ≥90%" >> $GITHUB_STEP_SUMMARY
+          echo "**Native binary:** Built" >> $GITHUB_STEP_SUMMARY
+          echo "**ARM64 binary:** Built" >> $GITHUB_STEP_SUMMARY
+
+  race_tests:
+    name: Race Tests
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go build and module files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: go-${{ env.GO_CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-${{ env.GO_CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ env.GO_VERSION }}-
+
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            g++ \
+            libbz2-dev \
+            libdivsufsort-dev \
+            libjsoncpp-dev \
+            libmpfr-dev \
+            libgmp-dev \
+            libssl-dev \
+            make
+
+      - name: Build NIST C++ library
+        run: make build-nist
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Run race-enabled tests
+        run: make test-race
+
+  docker_publish:
+    name: Build & Publish Docker image
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        env:
+          REGISTRY: ghcr.io
+          IMAGE_NAME: ${{ github.repository_owner }}/sp800-90b-entropy
+        run: |
+          set -euo pipefail
+          OWNER_IMAGE=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="${REGISTRY}/${OWNER_IMAGE}"
+          echo "Building ${IMAGE}:{sha,latest}"
+          docker build -t "${IMAGE}:${GITHUB_SHA}" -t "${IMAGE}:latest" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"

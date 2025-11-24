@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package nist.v1;
+
+option go_package = "github.com/AmmannChristian/nist-800-90b/pkg/pb";
+
+// EntropyService provides NIST SP 800-90B entropy assessment for entropy sources.
+service EntropyService {
+  // AssessEntropy performs entropy assessment on the provided data samples.
+  // Supports both IID (Independent and Identically Distributed) tests and
+  // Non-IID estimators as specified in NIST SP 800-90B.
+  rpc AssessEntropy(EntropyAssessmentRequest) returns (EntropyAssessmentResponse);
+}
+
+// EntropyAssessmentRequest contains the entropy source data and assessment parameters.
+message EntropyAssessmentRequest {
+  // Raw entropy samples packed into bytes.
+  // Samples are assumed to be packed into 8-bit values, where the least
+  // significant 'bits_per_symbol' bits constitute the symbol.
+  bytes data = 1;
+
+  // Number of bits per symbol (1-8, inclusive).
+  // For example, 8 for byte-level analysis, 1 for binary data.
+  uint32 bits_per_symbol = 2;
+
+  // If true, run IID (Independent and Identically Distributed) tests.
+  // IID tests include permutation tests and chi-square tests.
+  bool iid_mode = 3;
+
+  // If true, run Non-IID estimators.
+  // Non-IID estimators include MCV, Collision, Markov, Compression, etc.
+  bool non_iid_mode = 4;
+
+  // Verbosity level for output (0=quiet, 1=normal, 2=verbose, 3=debug).
+  uint32 verbosity = 5;
+}
+
+// EntropyAssessmentResponse contains the results of the entropy assessment.
+message EntropyAssessmentResponse {
+  // Minimum entropy estimate in bits per sample.
+  // This is the most conservative estimate across all tests/estimators.
+  double min_entropy = 1;
+
+  // Results from IID tests (if iid_mode was true).
+  repeated EstimatorResult iid_results = 2;
+
+  // Results from Non-IID estimators (if non_iid_mode was true).
+  repeated EstimatorResult non_iid_results = 3;
+
+  // Overall assessment result (true if data passes validation).
+  bool passed = 4;
+
+  // Human-readable summary of the assessment.
+  string assessment_summary = 5;
+
+  // Number of samples analyzed.
+  uint64 sample_count = 6;
+
+  // Actual bits per symbol used in the assessment.
+  uint32 bits_per_symbol = 7;
+}
+
+// EstimatorResult contains the result of a single estimator or test.
+message EstimatorResult {
+  // Name of the estimator or test (e.g., "Most Common Value", "Collision Test").
+  string name = 1;
+
+  // Entropy estimate in bits per sample.
+  // For IID tests, this may be derived from the p-value.
+  double entropy_estimate = 2;
+
+  // Whether this test/estimator passed (true) or failed (false).
+  // For IID tests, typically based on p-value >= 0.0001.
+  bool passed = 3;
+
+  // Additional test-specific metrics and details.
+  // May include p-values, test statistics, intermediate results, etc.
+  map<string, double> details = 4;
+
+  // Human-readable description of the result.
+  string description = 5;
+}

@@ -1,21 +1,21 @@
-version: '3.8'
-
 services:
-  # NIST 800-90B Entropy Assessment Service
-  nist-entropy:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: nist-entropy-service
+  nist-sp800-90b:
+    image:  ghcr.io/ammannchristian/nist-sp800-90b:latest
+    container_name: nist-sp800-90b
     ports:
-      - "50051:50051"  # gRPC
-      - "9090:9090"    # Metrics & Health
+      - "$GRPC_PORT:$GRPC_PORT"
+      - "$METRICS_PORT:$METRICS_PORT"
     environment:
-      - GRPC_PORT=50051
-      - METRICS_PORT=9090
-      - LOG_LEVEL=info
+      - GRPC_ENABLED=true
+      - GRPC_PORT=$GRPC_PORT
+      - METRICS_PORT=$METRICS_PORT
+      - LOG_LEVEL=$LOG_LEVEL
       - MAX_SAMPLE_SIZE=1000000
       - MIN_SAMPLE_SIZE=1000
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - AUTH_ISSUER=${AUTH_ISSUER:-}
+      - AUTH_AUDIENCE=${AUTH_AUDIENCE:-}
+      - AUTH_JWKS_URL=${AUTH_JWKS_URL:-}
     restart: unless-stopped
     networks:
       - nist-network

@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for SP800-90B Go Microservice with CGO
 
 # Stage 1: Builder
-FROM golang:1.21-bullseye AS builder
+FROM golang:1.25-bookworm AS builder
 
 # Install C++ build dependencies
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -32,7 +32,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /build/bin/ea_too
 RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /build/bin/server ./cmd/server
 
 # Stage 2: Runtime
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # Install runtime dependencies only
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -41,7 +41,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libjsoncpp25 \
     libmpfr6 \
     libgmp10 \
-    libssl1.1 \
+    libssl3 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

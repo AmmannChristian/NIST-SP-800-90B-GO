@@ -179,3 +179,13 @@ func TestRunStartsGRPCAndStops(t *testing.T) {
 		t.Fatalf("run did not return in time (grpc)")
 	}
 }
+
+// mustListen gives an ephemeral TCP port.
+func mustListen(t *testing.T) net.Listener {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("cannot listen on tcp :0: %v", err)
+	}
+	return ln
+}

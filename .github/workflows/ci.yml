@@ -72,6 +72,11 @@ jobs:
         run: |
           go mod download
           go install gotest.tools/gotestsum@v1.13.0
+          go install mvdan.cc/gofumpt@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Format check
         run: |

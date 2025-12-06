@@ -3,13 +3,14 @@ services:
     image:  ghcr.io/ammannchristian/nist-sp800-90b:latest
     container_name: nist-sp800-90b
     ports:
-      - "$GRPC_PORT:$GRPC_PORT"
-      - "$METRICS_PORT:$METRICS_PORT"
+      - "${GRPC_PORT:-9090}:${GRPC_PORT:-9090}"
+      - "${METRICS_PORT:-9091}:${METRICS_PORT:-9091}"
     environment:
-      - GRPC_ENABLED=true
-      - GRPC_PORT=$GRPC_PORT
-      - METRICS_PORT=$METRICS_PORT
-      - LOG_LEVEL=$LOG_LEVEL
+      - GRPC_ENABLED=${GRPC_ENABLED:-true}
+      - GRPC_PORT=${GRPC_PORT:-9090}
+      - METRICS_PORT=${METRICS_PORT:-9091}
+      - SERVER_PORT=${SERVER_PORT:-9091}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - MAX_SAMPLE_SIZE=1000000
       - MIN_SAMPLE_SIZE=1000
       - AUTH_ENABLED=${AUTH_ENABLED:-false}
@@ -26,7 +27,7 @@ services:
     networks:
       - nist-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${METRICS_PORT:-9091}/health"]
       interval: 30s
       timeout: 3s
       retries: 3

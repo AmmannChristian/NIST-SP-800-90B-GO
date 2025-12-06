@@ -16,7 +16,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
 
-	assert.Equal(t, 8080, cfg.ServerPort)
+	assert.Equal(t, 9091, cfg.ServerPort)
 	assert.Equal(t, "0.0.0.0", cfg.ServerHost)
 	assert.False(t, cfg.GRPCEnabled)
 	assert.Equal(t, 9090, cfg.GRPCPort)
@@ -40,6 +40,7 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	clearEnv(t)
 
 	os.Setenv("SERVER_PORT", "9000")
+	os.Setenv("METRICS_PORT", "9100")
 	os.Setenv("SERVER_HOST", "127.0.0.1")
 	os.Setenv("GRPC_ENABLED", "true")
 	os.Setenv("GRPC_PORT", "50051")
@@ -61,7 +62,7 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
 
-	assert.Equal(t, 9000, cfg.ServerPort)
+	assert.Equal(t, 9100, cfg.ServerPort)
 	assert.Equal(t, "127.0.0.1", cfg.ServerHost)
 	assert.True(t, cfg.GRPCEnabled)
 	assert.Equal(t, 50051, cfg.GRPCPort)
@@ -294,7 +295,16 @@ func TestLoadConfig_InvalidEnvironmentVariables(t *testing.T) {
 	os.Setenv("SERVER_PORT", "invalid")
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
-	assert.Equal(t, 8080, cfg.ServerPort) // Should fall back to default
+	assert.Equal(t, 9091, cfg.ServerPort) // Should fall back to default
+
+	clearEnv(t)
+
+	// Test invalid metrics port falls back to server port
+	os.Setenv("METRICS_PORT", "not-a-number")
+	os.Setenv("SERVER_PORT", "9101")
+	cfg, err = LoadConfig()
+	require.NoError(t, err)
+	assert.Equal(t, 9101, cfg.ServerPort)
 
 	clearEnv(t)
 
@@ -334,7 +344,7 @@ func TestLoadConfig_ValidationFailure(t *testing.T) {
 func clearEnv(t *testing.T) {
 	t.Helper()
 	envVars := []string{
-		"SERVER_PORT", "SERVER_HOST", "GRPC_ENABLED", "GRPC_PORT",
+		"SERVER_PORT", "SERVER_HOST", "GRPC_ENABLED", "GRPC_PORT", "METRICS_PORT",
 		"TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE", "TLS_CA_FILE", "TLS_CLIENT_AUTH", "TLS_MIN_VERSION",
 		"LOG_LEVEL", "MAX_UPLOAD_SIZE", "TIMEOUT", "METRICS_ENABLED",
 		"AUTH_ENABLED", "AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL",

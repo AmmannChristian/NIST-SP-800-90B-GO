@@ -52,7 +52,7 @@ func run() error {
 
 	log.Info().
 		Str("version", version).
-		Int("http_port", cfg.ServerPort).
+		Int("metrics_port", cfg.ServerPort).
 		Int("grpc_port", cfg.GRPCPort).
 		Bool("grpc_enabled", cfg.GRPCEnabled).
 		Bool("auth_enabled", cfg.AuthEnabled).

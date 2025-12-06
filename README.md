@@ -26,10 +26,12 @@ The service is validated against the upstream NIST reference tools ([SP800-90B_E
 docker-compose up -d
 ```
 
-- gRPC: enable with `GRPC_ENABLED=true` (default port `GRPC_PORT=50051`, mapped in `docker-compose.yml`).
-- Metrics/health: `SERVER_PORT` (default 8080). Set `SERVER_PORT=9090` to match the compose port mapping.
+- gRPC: enable with `GRPC_ENABLED=true` (default port `GRPC_PORT=9090`, mapped in `docker-compose.yml`).
+- Metrics/health: `METRICS_PORT`/`SERVER_PORT` (default 9091). Set either variable to match your compose port mapping.
 - Prometheus: `localhost:9092`
 - Grafana: `localhost:3000` (admin/admin)
+
+Defaults align with the SP800-22 service (`GRPC_PORT=9090`, `METRICS_PORT=9091`); override the env vars if you want different ports when running both stacks together.
 
 ### Local Build
 
@@ -42,13 +44,13 @@ make build-nist
 make build
 
 # Run the server with gRPC enabled
-SERVER_PORT=8080 GRPC_ENABLED=true GRPC_PORT=50051 ./build/server
+SERVER_PORT=9091 GRPC_ENABLED=true GRPC_PORT=9090 ./build/server
 ```
 
 ### Configuration
 
 Key environment variables:
-- `SERVER_PORT` / `SERVER_HOST` - HTTP metrics/health bind address (default: `0.0.0.0:8080`)
+- `METRICS_PORT` / `SERVER_PORT` / `SERVER_HOST` - HTTP metrics/health bind address (default: `0.0.0.0:9091`)
 - `GRPC_ENABLED` / `GRPC_PORT` - Enable and bind the gRPC API
 - `TLS_ENABLED` - Enable TLS for the gRPC server (default: false)
 - `TLS_CERT_FILE` / `TLS_KEY_FILE` - Server certificate and key (required when TLS is enabled)
@@ -83,7 +85,7 @@ Run the server with `GRPC_ENABLED=true`, then call via `grpcurl`:
 DATA_BASE64=$(base64 -w0 data.bin)
 grpcurl -plaintext \
   -d '{"data":"'"$DATA_BASE64"'","bits_per_symbol":8,"non_iid_mode":true}' \
-  localhost:50051 nist.v1.EntropyService/AssessEntropy
+  localhost:9090 nist.v1.EntropyService/AssessEntropy
 ```
 
 ## Implementation Guide
@@ -167,7 +169,7 @@ make bench-compare  # compare current vs baseline (requires benchstat)
 
 - `bits_per_symbol` must be between 0 (auto-detect) and 8.
 - Default upload cap: `MAX_UPLOAD_SIZE=100MB`.
-- gRPC is optional; enable with `GRPC_ENABLED=true` and configure ports via `GRPC_PORT`/`SERVER_PORT`.
+- gRPC is optional; enable with `GRPC_ENABLED=true` and configure ports via `GRPC_PORT`/`METRICS_PORT`.
 
 ### Performance Profiling
 

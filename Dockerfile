@@ -35,7 +35,8 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /build/bin/server
 FROM debian:bookworm-slim
 
 # Install runtime dependencies only
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates \
     libbz2-1.0 \
     libdivsufsort3 \
     libjsoncpp25 \
@@ -43,7 +44,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libgomp1 \
     libgmp10 \
     libssl3 \
-    ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -62,8 +63,14 @@ RUN chown -R entropy:entropy /app
 # Switch to non-root user
 USER entropy
 
-# Expose HTTP port
-EXPOSE 8080
+# Environment defaults (override via env vars)
+ENV GRPC_PORT=9090 \
+    SERVER_PORT=9091 \
+    METRICS_PORT=9091 \
+    LOG_LEVEL=info
+
+# Expose service ports
+EXPOSE 9090 9091
 
 # Default command: run server
 CMD ["/app/server"]

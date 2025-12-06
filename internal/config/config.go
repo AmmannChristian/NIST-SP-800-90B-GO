@@ -11,7 +11,7 @@ import (
 
 // Config holds the microservice configuration
 type Config struct {
-	// Server configuration
+	// Server configuration (HTTP metrics/health)
 	ServerPort  int
 	ServerHost  string
 	GRPCEnabled bool
@@ -48,7 +48,7 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	config := &Config{
 		// Defaults
-		ServerPort:     getEnvAsInt("SERVER_PORT", 8080),
+		ServerPort:     getEnvAsInt("METRICS_PORT", getEnvAsInt("SERVER_PORT", 9091)),
 		ServerHost:     getEnv("SERVER_HOST", "0.0.0.0"),
 		GRPCEnabled:    getEnvAsBool("GRPC_ENABLED", false),
 		GRPCPort:       getEnvAsInt("GRPC_PORT", 9090),

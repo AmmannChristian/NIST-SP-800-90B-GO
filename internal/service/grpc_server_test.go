@@ -16,7 +16,7 @@ func TestAssessEntropyValidation(t *testing.T) {
 
 	tests := []struct {
 		name string
-		req  *pb.EntropyAssessmentRequest
+		req  *pb.Sp80090BAssessmentRequest
 		code codes.Code
 	}{
 		{
@@ -26,7 +26,7 @@ func TestAssessEntropyValidation(t *testing.T) {
 		},
 		{
 			name: "empty data",
-			req: &pb.EntropyAssessmentRequest{
+			req: &pb.Sp80090BAssessmentRequest{
 				Data:          []byte{},
 				IidMode:       true,
 				NonIidMode:    false,
@@ -36,7 +36,7 @@ func TestAssessEntropyValidation(t *testing.T) {
 		},
 		{
 			name: "bits too high",
-			req: &pb.EntropyAssessmentRequest{
+			req: &pb.Sp80090BAssessmentRequest{
 				Data:          []byte{1, 2, 3},
 				IidMode:       true,
 				NonIidMode:    false,
@@ -46,7 +46,7 @@ func TestAssessEntropyValidation(t *testing.T) {
 		},
 		{
 			name: "no mode selected",
-			req: &pb.EntropyAssessmentRequest{
+			req: &pb.Sp80090BAssessmentRequest{
 				Data:          []byte{1, 2, 3},
 				BitsPerSymbol: 8,
 			},

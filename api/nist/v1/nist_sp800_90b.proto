@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package nist.sp800_90b.v1;
+
+option go_package = "github.com/AmmannChristian/nist-800-90b/pkg/pb;nistsp80090bv1";
+
+// Service for NIST SP 800-90B entropy assessment
+service Sp80090bAssessmentService {
+  // AssessEntropy performs NIST SP 800-90B entropy assessment on the provided data samples.
+  rpc AssessEntropy(Sp80090bAssessmentRequest) returns (Sp80090bAssessmentResponse);
+}
+
+// Sp80090bAssessmentRequest contains the entropy source data and assessment parameters.
+message Sp80090bAssessmentRequest {
+  // Raw entropy samples packed into bytes.
+  bytes data = 1;
+
+  // Number of bits per symbol (1-8, inclusive).
+  uint32 bits_per_symbol = 2;
+
+  // If true, run IID (Independent and Identically Distributed) tests.
+  bool iid_mode = 3;
+
+  // If true, run Non-IID estimators.
+  bool non_iid_mode = 4;
+
+  // Verbosity level for output (0=quiet, 1=normal, 2=verbose, 3=debug).
+  uint32 verbosity = 5;
+}
+
+// Sp80090bAssessmentResponse contains the results of the NIST SP 800-90B entropy assessment.
+message Sp80090bAssessmentResponse {
+  // Minimum entropy estimate in bits per sample.
+  double min_entropy = 1;
+
+  // Results from IID tests (if iid_mode was true).
+  repeated Sp80090bEstimatorResult iid_results = 2;
+
+  // Results from Non-IID estimators (if non_iid_mode was true).
+  repeated Sp80090bEstimatorResult non_iid_results = 3;
+
+  // Overall assessment result (true if data passes validation).
+  bool passed = 4;
+
+  // Human-readable summary of the assessment.
+  string assessment_summary = 5;
+
+  // Number of samples analyzed.
+  uint64 sample_count = 6;
+
+  // Actual bits per symbol used in the assessment.
+  uint32 bits_per_symbol = 7;
+}
+
+// Sp80090bEstimatorResult contains the result of a single NIST SP 800-90B estimator or test.
+message Sp80090bEstimatorResult {
+  // Name of the estimator or test (e.g., "Most Common Value", "Collision Test").
+  string name = 1;
+
+  // Entropy estimate in bits per sample.
+  double entropy_estimate = 2;
+
+  // Whether this test/estimator passed.
+  bool passed = 3;
+
+  // Additional test-specific metrics and details.
+  map<string, double> details = 4;
+
+  // Human-readable description of the result.
+  string description = 5;
+}

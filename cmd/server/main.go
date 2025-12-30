@@ -91,10 +91,11 @@ func run() error {
 
 		grpcServer = grpc.NewServer(serverOpts...)
 
-		pb.RegisterEntropyServiceServer(grpcServer, service.NewGRPCServer(service.NewService()))
+		pb.RegisterSp80090BAssessmentServiceServer(grpcServer, service.NewGRPCServer(service.NewService()))
 		healthServer := health.NewServer()
 		healthpb.RegisterHealthServer(grpcServer, healthServer)
 		healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+		healthServer.SetServingStatus("nist.sp800_90b.v1.Sp80090bAssessmentService", healthpb.HealthCheckResponse_SERVING)
 		reflection.Register(grpcServer)
 
 		go func() {

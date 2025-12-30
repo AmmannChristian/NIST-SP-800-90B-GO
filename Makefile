@@ -61,7 +61,7 @@ proto:
 	  -I $(PROTO_DIR) \
 	  --go_out=$(PB_DIR) --go_opt=paths=source_relative \
 	  --go-grpc_out=$(PB_DIR) --go-grpc_opt=paths=source_relative \
-	  $(PROTO_DIR)/service.proto; \
+	  $(PROTO_DIR)/nist_sp800_90b.proto; \
 	echo "Protobuf generation complete"; \
 	find $(PB_DIR) -maxdepth 5 -type f -name '*.pb.go' -print
 

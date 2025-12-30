@@ -20,7 +20,7 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 	data := []byte{1, 2, 3, 4}
 
 	// IID only
-	resp, err := server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	resp, err := server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          data,
 		BitsPerSymbol: 8,
 		IidMode:       true,
@@ -33,7 +33,7 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 	assert.Greater(t, resp.MinEntropy, 0.0)
 
 	// Non-IID only
-	resp, err = server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	resp, err = server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          data,
 		BitsPerSymbol: 8,
 		IidMode:       false,
@@ -44,7 +44,7 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 	assert.Len(t, resp.NonIidResults, 1)
 
 	// Mixed mode
-	resp, err = server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	resp, err = server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          data,
 		BitsPerSymbol: 8,
 		IidMode:       true,
@@ -60,7 +60,7 @@ func TestAssessEntropyUsedBitsFallback(t *testing.T) {
 	server := NewGRPCServer(NewService())
 	data := []byte{1, 2, 3, 4}
 
-	resp, err := server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	resp, err := server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          data,
 		BitsPerSymbol: 0,
 		IidMode:       true,
@@ -74,7 +74,7 @@ func TestAssessEntropyUsedBitsFallback(t *testing.T) {
 func TestAssessEntropyIIDError(t *testing.T) {
 	server := NewGRPCServer(NewService())
 
-	_, err := server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	_, err := server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          []byte{0xFF, 1, 2},
 		BitsPerSymbol: 8,
 		IidMode:       true,
@@ -89,7 +89,7 @@ func TestAssessEntropyIIDError(t *testing.T) {
 func TestAssessEntropyNonIIDError(t *testing.T) {
 	server := NewGRPCServer(NewService())
 
-	_, err := server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	_, err := server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          []byte{0xFF, 1, 2},
 		BitsPerSymbol: 8,
 		IidMode:       false,
@@ -104,7 +104,7 @@ func TestAssessEntropyNonIIDError(t *testing.T) {
 func TestAssessEntropyInfinityFallback(t *testing.T) {
 	server := NewGRPCServer(NewService())
 
-	resp, err := server.AssessEntropy(context.Background(), &pb.EntropyAssessmentRequest{
+	resp, err := server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          []byte{0xEE, 1, 2},
 		BitsPerSymbol: 8,
 		IidMode:       false,

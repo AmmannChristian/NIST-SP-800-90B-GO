@@ -11,12 +11,14 @@ import (
 
 	"github.com/AmmannChristian/nist-800-90b/internal/metrics"
 	"github.com/AmmannChristian/nist-800-90b/internal/middleware"
-	"github.com/AmmannChristian/nist-800-90b/pkg/pb"
+	pb "github.com/AmmannChristian/nist-800-90b/pkg/pb"
 )
 
-// GRPCServer implements the EntropyService gRPC interface.
+const Version = "2.0.0"
+
+// GRPCServer implements the Sp80090BAssessmentService gRPC interface.
 type GRPCServer struct {
-	pb.UnimplementedEntropyServiceServer
+	pb.UnimplementedSp80090BAssessmentServiceServer
 	svc *EntropyService
 }
 
@@ -27,8 +29,8 @@ func NewGRPCServer(svc *EntropyService) *GRPCServer {
 	}
 }
 
-// AssessEntropy handles gRPC requests for entropy assessment.
-func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.EntropyAssessmentRequest) (*pb.EntropyAssessmentResponse, error) {
+// AssessEntropy handles gRPC requests for NIST SP 800-90B entropy assessment.
+func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessmentRequest) (*pb.Sp80090BAssessmentResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
@@ -57,8 +59,8 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.EntropyAssessmen
 	metrics.RecordDataSize(testType, len(req.Data))
 
 	bits := int(req.BitsPerSymbol)
-	var iidResults []*pb.EstimatorResult
-	var nonIIDResults []*pb.EstimatorResult
+	var iidResults []*pb.Sp80090BEstimatorResult
+	var nonIIDResults []*pb.Sp80090BEstimatorResult
 	minEntropy := math.Inf(1)
 	var usedBits uint32
 
@@ -72,7 +74,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.EntropyAssessmen
 		}
 		minEntropy = math.Min(minEntropy, res.MinEntropy)
 		usedBits = uint32(res.DataWordSize)
-		iidResults = append(iidResults, &pb.EstimatorResult{
+		iidResults = append(iidResults, &pb.Sp80090BEstimatorResult{
 			Name:            "IID",
 			EntropyEstimate: res.MinEntropy,
 			Passed:          true,
@@ -95,7 +97,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.EntropyAssessmen
 		}
 		minEntropy = math.Min(minEntropy, res.MinEntropy)
 		usedBits = uint32(res.DataWordSize)
-		nonIIDResults = append(nonIIDResults, &pb.EstimatorResult{
+		nonIIDResults = append(nonIIDResults, &pb.Sp80090BEstimatorResult{
 			Name:            "Non-IID",
 			EntropyEstimate: res.MinEntropy,
 			Passed:          true,
@@ -119,12 +121,12 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.EntropyAssessmen
 	}
 	metrics.RecordDuration(testType, time.Since(startTime).Seconds())
 
-	return &pb.EntropyAssessmentResponse{
+	return &pb.Sp80090BAssessmentResponse{
 		MinEntropy:        minEntropy,
 		IidResults:        iidResults,
 		NonIidResults:     nonIIDResults,
 		Passed:            true,
-		AssessmentSummary: "entropy assessment completed",
+		AssessmentSummary: "NIST SP 800-90B entropy assessment completed",
 		SampleCount:       uint64(len(req.Data)),
 		BitsPerSymbol:     usedBits,
 	}, nil

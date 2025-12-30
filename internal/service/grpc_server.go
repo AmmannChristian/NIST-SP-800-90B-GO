@@ -2,15 +2,14 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/AmmannChristian/nist-800-90b/internal/entropy"
 	"github.com/AmmannChristian/nist-800-90b/internal/metrics"
-	"github.com/AmmannChristian/nist-800-90b/internal/middleware"
 	pb "github.com/AmmannChristian/nist-800-90b/pkg/pb"
 )
 
@@ -47,7 +46,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 		return nil, status.Error(codes.InvalidArgument, "either iid_mode or non_iid_mode must be enabled")
 	}
 
-	requestID := middleware.GetRequestID(ctx)
+	_ = ctx // requestID no longer needed in response
 	testType := "mixed"
 	if req.IidMode && !req.NonIidMode {
 		testType = "IID"
@@ -74,17 +73,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 		}
 		minEntropy = math.Min(minEntropy, res.MinEntropy)
 		usedBits = uint32(res.DataWordSize)
-		iidResults = append(iidResults, &pb.Sp80090BEstimatorResult{
-			Name:            "IID",
-			EntropyEstimate: res.MinEntropy,
-			Passed:          true,
-			Details: map[string]float64{
-				"h_original":  res.HOriginal,
-				"h_bitstring": res.HBitstring,
-				"h_assessed":  res.HAssessed,
-			},
-			Description: fmt.Sprintf("IID minimum entropy estimate (request_id=%s)", requestID),
-		})
+		iidResults = convertEstimatorsToProto(res.Estimators)
 	}
 
 	// Non-IID path
@@ -97,17 +86,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 		}
 		minEntropy = math.Min(minEntropy, res.MinEntropy)
 		usedBits = uint32(res.DataWordSize)
-		nonIIDResults = append(nonIIDResults, &pb.Sp80090BEstimatorResult{
-			Name:            "Non-IID",
-			EntropyEstimate: res.MinEntropy,
-			Passed:          true,
-			Details: map[string]float64{
-				"h_original":  res.HOriginal,
-				"h_bitstring": res.HBitstring,
-				"h_assessed":  res.HAssessed,
-			},
-			Description: fmt.Sprintf("Non-IID minimum entropy estimate (request_id=%s)", requestID),
-		})
+		nonIIDResults = convertEstimatorsToProto(res.Estimators)
 	}
 
 	if usedBits == 0 {
@@ -130,4 +109,35 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 		SampleCount:       uint64(len(req.Data)),
 		BitsPerSymbol:     usedBits,
 	}, nil
+}
+
+// convertEstimatorsToProto converts Go estimator results to protobuf messages
+func convertEstimatorsToProto(estimators []entropy.EstimatorResult) []*pb.Sp80090BEstimatorResult {
+	if len(estimators) == 0 {
+		return nil
+	}
+
+	results := make([]*pb.Sp80090BEstimatorResult, len(estimators))
+	for i, est := range estimators {
+		details := make(map[string]float64)
+		if est.IsEntropyValid {
+			details["entropy_estimate"] = est.EntropyEstimate
+		}
+
+		description := est.Name
+		if est.IsEntropyValid {
+			description += " entropy estimator"
+		} else {
+			description += " statistical test"
+		}
+
+		results[i] = &pb.Sp80090BEstimatorResult{
+			Name:            est.Name,
+			EntropyEstimate: est.EntropyEstimate,
+			Passed:          est.Passed,
+			Details:         details,
+			Description:     description,
+		}
+	}
+	return results
 }

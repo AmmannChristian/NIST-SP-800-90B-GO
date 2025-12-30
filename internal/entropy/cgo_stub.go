@@ -6,6 +6,32 @@ import "math"
 
 // Test stub for CGO-backed functions to allow fast unit testing without the C++ library.
 
+// stubIIDEstimators returns mock IID estimator results
+func stubIIDEstimators() []EstimatorResult {
+	return []EstimatorResult{
+		{Name: "Most Common Value", EntropyEstimate: 7.6, Passed: true, IsEntropyValid: true},
+		{Name: "Chi-Square Tests", EntropyEstimate: -1.0, Passed: true, IsEntropyValid: false},
+		{Name: "Length of Longest Repeated Substring Test", EntropyEstimate: -1.0, Passed: true, IsEntropyValid: false},
+		{Name: "Permutation Tests", EntropyEstimate: -1.0, Passed: true, IsEntropyValid: false},
+	}
+}
+
+// stubNonIIDEstimators returns mock Non-IID estimator results
+func stubNonIIDEstimators() []EstimatorResult {
+	return []EstimatorResult{
+		{Name: "Most Common Value", EntropyEstimate: 6.8, Passed: true, IsEntropyValid: true},
+		{Name: "Collision Test", EntropyEstimate: 6.9, Passed: true, IsEntropyValid: true},
+		{Name: "Markov Test", EntropyEstimate: 6.7, Passed: true, IsEntropyValid: true},
+		{Name: "Compression Test", EntropyEstimate: 6.5, Passed: true, IsEntropyValid: true},
+		{Name: "t-Tuple Test", EntropyEstimate: 6.6, Passed: true, IsEntropyValid: true},
+		{Name: "LRS Test", EntropyEstimate: 6.8, Passed: true, IsEntropyValid: true},
+		{Name: "Multi Most Common in Window Test", EntropyEstimate: 6.7, Passed: true, IsEntropyValid: true},
+		{Name: "Lag Prediction Test", EntropyEstimate: 6.9, Passed: true, IsEntropyValid: true},
+		{Name: "Multi Markov Model with Counting Test", EntropyEstimate: 6.6, Passed: true, IsEntropyValid: true},
+		{Name: "LZ78Y Test", EntropyEstimate: 6.5, Passed: true, IsEntropyValid: true},
+	}
+}
+
 func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, error) {
 	if len(data) > 0 && data[0] == 0xFF {
 		return nil, newError("calculateIIDEntropy", ErrInvalidData, "stub failure")
@@ -18,6 +44,7 @@ func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, 
 			HAssessed:    math.Inf(1),
 			DataWordSize: bitsPerSymbol,
 			TestType:     IID,
+			Estimators:   nil,
 		}, nil
 	}
 	return &Result{
@@ -27,6 +54,7 @@ func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, 
 		HAssessed:    7.5,
 		DataWordSize: bitsPerSymbol,
 		TestType:     IID,
+		Estimators:   stubIIDEstimators(),
 	}, nil
 }
 
@@ -42,6 +70,7 @@ func calculateNonIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Resul
 			HAssessed:    math.Inf(1),
 			DataWordSize: bitsPerSymbol,
 			TestType:     NonIID,
+			Estimators:   nil,
 		}, nil
 	}
 	return &Result{
@@ -51,5 +80,6 @@ func calculateNonIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Resul
 		HAssessed:    6.5,
 		DataWordSize: bitsPerSymbol,
 		TestType:     NonIID,
+		Estimators:   stubNonIIDEstimators(),
 	}, nil
 }

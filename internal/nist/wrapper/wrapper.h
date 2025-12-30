@@ -9,6 +9,17 @@ extern "C" {
 #include <stddef.h>
 #include <stdbool.h>
 
+// Maximum number of estimators per assessment
+#define MAX_ESTIMATORS 16
+
+// Individual estimator result
+typedef struct {
+    char name[64];           // Estimator name (e.g., "Most Common Value")
+    double entropy_estimate; // Entropy estimate (-1.0 if not applicable)
+    bool passed;             // Whether the test passed
+    bool is_entropy_valid;   // true if entropy_estimate is valid
+} EstimatorResult;
+
 // Result structure for entropy calculations
 typedef struct {
     double min_entropy;      // Minimum entropy estimate
@@ -18,6 +29,10 @@ typedef struct {
     int data_word_size;      // Bits per symbol
     int error_code;          // 0 = success, negative = error
     char error_message[512]; // Error description
+
+    // Individual estimator results
+    EstimatorResult estimators[MAX_ESTIMATORS];
+    int estimator_count;     // Number of valid entries in estimators array
 } EntropyResult;
 
 /**

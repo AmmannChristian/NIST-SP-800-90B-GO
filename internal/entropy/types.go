@@ -22,6 +22,14 @@ func (t TestType) String() string {
 	}
 }
 
+// EstimatorResult contains the result of a single NIST SP 800-90B estimator
+type EstimatorResult struct {
+	Name            string  // Estimator name (e.g., "Most Common Value")
+	EntropyEstimate float64 // Entropy estimate (-1.0 if not applicable)
+	Passed          bool    // Whether the test passed
+	IsEntropyValid  bool    // true if EntropyEstimate is valid
+}
+
 // Result contains the entropy assessment results
 type Result struct {
 	MinEntropy   float64  // Minimum entropy estimate
@@ -30,6 +38,9 @@ type Result struct {
 	HAssessed    float64  // Assessed entropy value
 	DataWordSize int      // Bits per symbol
 	TestType     TestType // Type of test performed
+
+	// Individual estimator results
+	Estimators []EstimatorResult
 }
 
 // Assessment configuration

@@ -19,7 +19,7 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 	server := NewGRPCServer(NewService())
 	data := []byte{1, 2, 3, 4}
 
-	// IID only
+	// IID, returns 4 individual estimator results
 	resp, err := server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          data,
 		BitsPerSymbol: 8,
@@ -27,12 +27,14 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 		NonIidMode:    false,
 	})
 	require.NoError(t, err)
-	assert.Len(t, resp.IidResults, 1)
+	assert.Len(t, resp.IidResults, 4) // MCV, Chi-Square, LRS, Permutation
 	assert.Len(t, resp.NonIidResults, 0)
 	assert.Equal(t, uint32(8), resp.BitsPerSymbol)
 	assert.Greater(t, resp.MinEntropy, 0.0)
+	// Verify first estimator is Most Common Value
+	assert.Equal(t, "Most Common Value", resp.IidResults[0].Name)
 
-	// Non-IID only
+	// Non-IID, returns 10 individual estimator results
 	resp, err = server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
 		Data:          data,
 		BitsPerSymbol: 8,
@@ -41,7 +43,9 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, resp.IidResults, 0)
-	assert.Len(t, resp.NonIidResults, 1)
+	assert.Len(t, resp.NonIidResults, 10) // All 10 Non-IID estimators
+	// Verify first estimator is Most Common Value
+	assert.Equal(t, "Most Common Value", resp.NonIidResults[0].Name)
 
 	// Mixed mode
 	resp, err = server.AssessEntropy(context.Background(), &pb.Sp80090BAssessmentRequest{
@@ -51,8 +55,8 @@ func TestAssessEntropySuccessModes(t *testing.T) {
 		NonIidMode:    true,
 	})
 	require.NoError(t, err)
-	assert.Len(t, resp.IidResults, 1)
-	assert.Len(t, resp.NonIidResults, 1)
+	assert.Len(t, resp.IidResults, 4)
+	assert.Len(t, resp.NonIidResults, 10)
 	assert.True(t, resp.Passed)
 }
 
@@ -67,7 +71,7 @@ func TestAssessEntropyUsedBitsFallback(t *testing.T) {
 		NonIidMode:    false,
 	})
 	require.NoError(t, err)
-	assert.Len(t, resp.IidResults, 1)
+	assert.Len(t, resp.IidResults, 4) // 4 IID estimators
 	assert.Equal(t, uint32(0), resp.BitsPerSymbol)
 }
 

@@ -49,9 +49,30 @@ func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, 
 		HAssessed:    float64(cResult.h_assessed),
 		DataWordSize: int(cResult.data_word_size),
 		TestType:     IID,
+		Estimators:   convertEstimators(cResult),
 	}
 
 	return result, nil
+}
+
+// convertEstimators converts C estimator array to Go slice
+func convertEstimators(cResult *C.EntropyResult) []EstimatorResult {
+	count := int(cResult.estimator_count)
+	if count <= 0 {
+		return nil
+	}
+
+	estimators := make([]EstimatorResult, count)
+	for i := 0; i < count; i++ {
+		cEst := cResult.estimators[i]
+		estimators[i] = EstimatorResult{
+			Name:            C.GoString(&cEst.name[0]),
+			EntropyEstimate: float64(cEst.entropy_estimate),
+			Passed:          bool(cEst.passed),
+			IsEntropyValid:  bool(cEst.is_entropy_valid),
+		}
+	}
+	return estimators
 }
 
 // calculateNonIIDEntropy calls the C wrapper to perform Non-IID entropy calculation
@@ -90,6 +111,7 @@ func calculateNonIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Resul
 		HAssessed:    float64(cResult.h_assessed),
 		DataWordSize: int(cResult.data_word_size),
 		TestType:     NonIID,
+		Estimators:   convertEstimators(cResult),
 	}
 
 	return result, nil

@@ -1,3 +1,7 @@
+// Package main bootstraps the NIST SP 800-90B entropy assessment gRPC server.
+// It provides optional TLS/mTLS, OIDC authentication, Prometheus metrics, and
+// an HTTP health endpoint. The server delegates entropy computations to a CGO
+// bridge that invokes the upstream NIST C++ reference implementation.
 package main
 
 import (
@@ -32,6 +36,8 @@ const (
 	version = "1.0.0"
 )
 
+// server holds references to the loaded configuration and the HTTP multiplexer
+// used for health and metrics endpoints.
 type server struct {
 	config *config.Config
 	mux    *http.ServeMux
@@ -43,8 +49,10 @@ func main() {
 	}
 }
 
+// run initializes the server, starts gRPC and HTTP listeners, and blocks until
+// a termination signal is received or a fatal error occurs. It performs a
+// graceful shutdown with a 30-second deadline.
 func run() error {
-	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
@@ -61,16 +69,13 @@ func run() error {
 		Int64("max_upload_bytes", cfg.MaxUploadSize).
 		Msg("starting SP800-90B entropy assessment server")
 
-	// Create server
 	srv := &server{
 		config: cfg,
 		mux:    http.NewServeMux(),
 	}
 
-	// Channel to listen for errors coming from the listener
 	serverErrors := make(chan error, 2)
 
-	// Optional gRPC server
 	var grpcServer *grpc.Server
 	var grpcListener net.Listener
 	if cfg.GRPCEnabled {
@@ -106,11 +111,9 @@ func run() error {
 		}()
 	}
 
-	// Channel to listen for interrupt signal
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
-	// Optional metrics/health server on HTTP
 	var httpServer *http.Server
 	if cfg.MetricsEnabled {
 		srv.registerRoutes()
@@ -129,18 +132,15 @@ func run() error {
 		}()
 	}
 
-	// Block until we receive a signal or error
 	select {
 	case err := <-serverErrors:
 		return fmt.Errorf("server error: %w", err)
 	case sig := <-shutdown:
 		log.Info().Str("signal", sig.String()).Msg("shutdown requested")
 
-		// Give outstanding requests a deadline for completion
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		// Gracefully shutdown the server
 		if httpServer != nil {
 			if err := httpServer.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				httpServer.Close()
@@ -161,6 +161,9 @@ func run() error {
 	return nil
 }
 
+// buildUnaryInterceptors assembles the chain of gRPC unary interceptors. It
+// always includes request ID injection and structured logging. When authentication
+// is enabled, an OIDC token validator is appended with health-check exemptions.
 func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, error) {
 	interceptors := []grpc.UnaryServerInterceptor{
 		middleware.UnaryRequestIDInterceptor(),
@@ -196,6 +199,9 @@ func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, 
 	)), nil
 }
 
+// buildGRPCServerOptions constructs gRPC server options from the provided
+// configuration. When TLS is enabled, it loads certificates and configures
+// client authentication and minimum protocol version.
 func buildGRPCServerOptions(cfg *config.Config, unaryInterceptors []grpc.UnaryServerInterceptor) ([]grpc.ServerOption, error) {
 	opts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(unaryInterceptors...),
@@ -240,6 +246,7 @@ func buildGRPCServerOptions(cfg *config.Config, unaryInterceptors []grpc.UnarySe
 	return append(opts, tlsOpt), nil
 }
 
+// tlsVersionString returns a human-readable string for a TLS version constant.
 func tlsVersionString(version uint16) string {
 	switch version {
 	case tls.VersionTLS13:
@@ -251,8 +258,8 @@ func tlsVersionString(version uint16) string {
 	}
 }
 
+// registerRoutes configures HTTP handlers for the /health and /metrics endpoints.
 func (s *server) registerRoutes() {
-	// Health check
 	s.mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -266,7 +273,6 @@ func (s *server) registerRoutes() {
 		json.NewEncoder(w).Encode(health)
 	})
 
-	// Metrics endpoint
 	s.mux.Handle("/metrics", promhttp.Handler())
 }
 

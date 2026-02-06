@@ -1,5 +1,9 @@
 //go:build !teststub
 
+// This file provides the CGO bridge to the NIST SP 800-90B C++ reference
+// implementation. It is excluded when the "teststub" build tag is active,
+// allowing unit tests to run without the C++ toolchain.
+
 package entropy
 
 /*
@@ -14,13 +18,13 @@ import (
 	"unsafe"
 )
 
-// calculateIIDEntropy calls the C wrapper to perform IID entropy calculation
+// calculateIIDEntropy invokes the C wrapper to run IID tests including
+// Most Common Value, Chi-Square, LRS, and Permutation tests.
 func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, error) {
 	if len(data) == 0 {
 		return nil, newError("calculateIIDEntropy", ErrInvalidData, "data is empty")
 	}
 
-	// Convert Go slice to C array
 	cData := (*C.uint8_t)(unsafe.Pointer(&data[0]))
 	cLength := C.size_t(len(data))
 	cBitsPerSymbol := C.int(bitsPerSymbol)
@@ -28,20 +32,17 @@ func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, 
 	cInitialEntropy := C.bool(true)
 	cVerbose := C.int(verbose)
 
-	// Call C function
 	cResult := C.calculate_iid_entropy(cData, cLength, cBitsPerSymbol, cInitialEntropy, cVerbose)
 	if cResult == nil {
 		return nil, newError("calculateIIDEntropy", ErrMemoryAllocation, "failed to allocate result structure")
 	}
 	defer C.free_entropy_result(cResult)
 
-	// Check for errors
 	if cResult.error_code != 0 {
 		errMsg := C.GoString(&cResult.error_message[0])
 		return nil, wrapCError("calculateIIDEntropy", int(cResult.error_code), errMsg)
 	}
 
-	// Convert C result to Go result
 	result := &Result{
 		MinEntropy:   float64(cResult.min_entropy),
 		HOriginal:    float64(cResult.h_original),
@@ -55,7 +56,8 @@ func calculateIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, 
 	return result, nil
 }
 
-// convertEstimators converts C estimator array to Go slice
+// convertEstimators marshals the C-allocated estimator array from an
+// EntropyResult into a Go slice of EstimatorResult values.
 func convertEstimators(cResult *C.EntropyResult) []EstimatorResult {
 	count := int(cResult.estimator_count)
 	if count <= 0 {
@@ -75,13 +77,13 @@ func convertEstimators(cResult *C.EntropyResult) []EstimatorResult {
 	return estimators
 }
 
-// calculateNonIIDEntropy calls the C wrapper to perform Non-IID entropy calculation
+// calculateNonIIDEntropy invokes the C wrapper to run all ten Non-IID
+// estimators defined in NIST SP 800-90B Section 6.3.
 func calculateNonIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Result, error) {
 	if len(data) == 0 {
 		return nil, newError("calculateNonIIDEntropy", ErrInvalidData, "data is empty")
 	}
 
-	// Convert Go slice to C array
 	cData := (*C.uint8_t)(unsafe.Pointer(&data[0]))
 	cLength := C.size_t(len(data))
 	cBitsPerSymbol := C.int(bitsPerSymbol)
@@ -90,20 +92,17 @@ func calculateNonIIDEntropy(data []byte, bitsPerSymbol int, verbose int) (*Resul
 	cInitialEntropy := C.bool(true)
 	cVerbose := C.int(verbose)
 
-	// Call C function
 	cResult := C.calculate_non_iid_entropy(cData, cLength, cBitsPerSymbol, cInitialEntropy, cVerbose)
 	if cResult == nil {
 		return nil, newError("calculateNonIIDEntropy", ErrMemoryAllocation, "failed to allocate result structure")
 	}
 	defer C.free_entropy_result(cResult)
 
-	// Check for errors
 	if cResult.error_code != 0 {
 		errMsg := C.GoString(&cResult.error_message[0])
 		return nil, wrapCError("calculateNonIIDEntropy", int(cResult.error_code), errMsg)
 	}
 
-	// Convert C result to Go result
 	result := &Result{
 		MinEntropy:   float64(cResult.min_entropy),
 		HOriginal:    float64(cResult.h_original),

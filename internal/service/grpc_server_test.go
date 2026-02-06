@@ -65,6 +65,8 @@ func TestAssessEntropyValidation(t *testing.T) {
 	}
 }
 
+// nineBits returns a uint32 value exceeding the valid bits-per-symbol range,
+// used to avoid a compile-time constant overflow warning in test literals.
 func nineBits() uint32 {
 	return 9
 }

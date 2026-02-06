@@ -9,7 +9,9 @@ import (
 	"github.com/AmmannChristian/nist-800-90b/internal/entropy"
 )
 
-// runCLI executes the CLI logic and returns an exit code.
+// runCLI parses command-line arguments, reads input data from a file or stdin,
+// and performs an IID or Non-IID entropy assessment. It returns an exit code:
+// 0 on success, 1 on assessment error, or 2 on argument validation failure.
 func runCLI(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("ea_tool", flag.ContinueOnError)
 	fs.SetOutput(stderr)

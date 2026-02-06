@@ -1,4 +1,14 @@
-/* C wrapper for NIST SP800-90B Entropy Assessment C++ library */
+/**
+ * @file wrapper.cpp
+ * @brief C-linkage wrapper around the NIST SP 800-90B C++ reference
+ *        implementation. Exposes IID and Non-IID entropy assessment through
+ *        a flat C API suitable for invocation via CGO.
+ *
+ * Memory management follows a caller-owns-result pattern: every EntropyResult
+ * pointer returned by the calculate_* functions must be freed by calling
+ * free_entropy_result. Internally, a DataGuard RAII object ensures the NIST
+ * data_t structure is cleaned up even if an exception is thrown.
+ */
 
 #include "wrapper.h"
 
@@ -6,7 +16,6 @@
 #include <cstdlib> // malloc, free
 #include <exception>
 
-// Include NIST C++ headers
 #include "../cpp/shared/utils.h"
 #include "../cpp/shared/most_common.h"
 #include "../cpp/shared/lrs_test.h"
@@ -24,7 +33,10 @@
 
 #include <array>
 
-// RAII guard for data_t to prevent memory leaks on exceptions
+/**
+ * @brief RAII guard for data_t that guarantees free_data() is called on scope
+ *        exit, preventing memory leaks when NIST library functions throw.
+ */
 class DataGuard {
 public:
     explicit DataGuard(data_t* dp) : dp_(dp), released_(false) {}
@@ -45,7 +57,7 @@ private:
 
 extern "C" {
 
-// Helper function to create and initialize result structure
+// Allocates and zero-initializes an EntropyResult on the heap.
 static EntropyResult* create_result() {
     EntropyResult* result = (EntropyResult*)malloc(sizeof(EntropyResult));
     if (result) {
@@ -61,7 +73,7 @@ static EntropyResult* create_result() {
     return result;
 }
 
-// Helper function to add an estimator result with entropy value
+// Appends an estimator entry with a valid entropy value to the result array.
 static void add_estimator(EntropyResult* result, const char* name, double entropy, bool passed) {
     if (result->estimator_count >= MAX_ESTIMATORS) return;
     EstimatorResult* est = &result->estimators[result->estimator_count++];
@@ -72,7 +84,7 @@ static void add_estimator(EntropyResult* result, const char* name, double entrop
     est->is_entropy_valid = (entropy >= 0.0);
 }
 
-// Helper function to add a pass/fail test result (no entropy value)
+// Appends a pass/fail test result without an entropy estimate.
 static void add_test_result(EntropyResult* result, const char* name, bool passed) {
     if (result->estimator_count >= MAX_ESTIMATORS) return;
     EstimatorResult* est = &result->estimators[result->estimator_count++];
@@ -83,14 +95,23 @@ static void add_test_result(EntropyResult* result, const char* name, bool passed
     est->is_entropy_valid = false;
 }
 
-// Helper function to set error in result
+// Records an error code and message in the result structure.
 static void set_error(EntropyResult* result, int code, const char* message) {
     result->error_code = code;
     strncpy(result->error_message, message, sizeof(result->error_message) - 1);
     result->error_message[sizeof(result->error_message) - 1] = '\0';
 }
 
-// Helper function to prepare data_t structure from raw bytes
+/**
+ * @brief Initializes a NIST data_t structure from raw sample bytes.
+ *
+ * Handles word-size auto-detection when bits_per_symbol is 0, builds the
+ * symbol alphabet mapping, and constructs the bitstring representation
+ * required by several Non-IID estimators.
+ *
+ * @return true on success; false if memory allocation fails (error is
+ *         recorded in result).
+ */
 static bool prepare_data(data_t* dp, const uint8_t* data, size_t length, int bits_per_symbol, EntropyResult* result) {
     dp->word_size = bits_per_symbol;
     dp->len = (long)length;
@@ -160,8 +181,8 @@ static bool prepare_data(data_t* dp, const uint8_t* data, size_t length, int bit
         }
     }
 
-    // Create bitstring from rawsymbols (not mapped symbols)
-    // See NIST Issue #71: https://github.com/usnistgov/SP800-90B_EntropyAssessment/issues/71
+    // Build bitstring from rawsymbols rather than mapped symbols to match
+    // the corrected NIST reference implementation behavior.
     dp->blen = dp->len * dp->word_size;
     if (dp->word_size == 1) {
         dp->bsymbols = dp->symbols;
@@ -174,7 +195,6 @@ static bool prepare_data(data_t* dp, const uint8_t* data, size_t length, int bit
             return false;
         }
 
-        // Build bitstring from rawsymbols, not from mapped symbols
         for (long i = 0; i < dp->len; i++) {
             uint8_t raw = dp->rawsymbols[i] & mask;
             for (int j = 0; j < dp->word_size; j++) {

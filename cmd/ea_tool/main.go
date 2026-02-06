@@ -1,3 +1,6 @@
+// Package main implements the ea_tool command-line interface for performing
+// NIST SP 800-90B entropy assessments on binary data files. It supports both
+// IID and Non-IID test modes and produces human-readable or JSON output.
 package main
 
 import (
@@ -10,7 +13,8 @@ const (
 	version = "1.0.0"
 )
 
-// JSONOutput represents the JSON output format
+// JSONOutput represents the structured JSON output of an entropy assessment,
+// including entropy estimates, metadata, and any error information.
 type JSONOutput struct {
 	Version       string  `json:"version"`
 	Filename      string  `json:"filename"`
@@ -29,6 +33,8 @@ func main() {
 	os.Exit(runCLI(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
+// writeJSON serializes data as indented JSON and writes it to the specified file.
+// On failure, an error message is printed to stderr and the process exits.
 func writeJSON(filename string, data interface{}) {
 	file, err := os.Create(filename)
 	if err != nil {

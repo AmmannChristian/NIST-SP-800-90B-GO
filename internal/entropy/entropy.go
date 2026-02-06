@@ -7,32 +7,31 @@ import (
 )
 
 const (
-	// MinRecommendedSamples is the minimum number of samples recommended by SP800-90B
+	// MinRecommendedSamples is the minimum number of samples recommended by
+	// NIST SP 800-90B for reliable entropy estimation (1,000,000).
 	MinRecommendedSamples = 1000000
 )
 
-// AssessFile reads a binary file and performs entropy assessment
+// AssessFile reads a binary file from disk and delegates to AssessReader for
+// entropy assessment using the specified test type and bits-per-symbol value.
 func (a *Assessment) AssessFile(filename string, bitsPerSymbol int, testType TestType) (*Result, error) {
-	// Open file
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, newError("AssessFile", err, fmt.Sprintf("failed to open file: %s", filename))
 	}
 	defer file.Close()
 
-	// Read file contents
 	return a.AssessReader(file, bitsPerSymbol, testType)
 }
 
-// AssessReader reads from an io.Reader and performs entropy assessment
+// AssessReader reads all data from the provided io.Reader and dispatches to
+// AssessIID or AssessNonIID based on the given test type.
 func (a *Assessment) AssessReader(r io.Reader, bitsPerSymbol int, testType TestType) (*Result, error) {
-	// Read all data
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, newError("AssessReader", err, "failed to read data")
 	}
 
-	// Perform assessment based on test type
 	switch testType {
 	case IID:
 		return a.AssessIID(data, bitsPerSymbol)
@@ -43,44 +42,40 @@ func (a *Assessment) AssessReader(r io.Reader, bitsPerSymbol int, testType TestT
 	}
 }
 
-// AssessIID performs IID (Independent and Identically Distributed) entropy assessment
+// AssessIID performs an IID (Independent and Identically Distributed) entropy
+// assessment. A bitsPerSymbol value of 0 triggers auto-detection; valid explicit
+// values are 1 through 8. The data slice must be non-empty.
 func (a *Assessment) AssessIID(data []byte, bitsPerSymbol int) (*Result, error) {
-	// Validate bits per symbol
 	if bitsPerSymbol < 0 || bitsPerSymbol > 8 {
 		return nil, newError("AssessIID", ErrInvalidBitsPerSymbol, fmt.Sprintf("got %d", bitsPerSymbol))
 	}
 
-	// Validate data
 	if len(data) == 0 {
 		return nil, newError("AssessIID", ErrInvalidData, "data is empty")
 	}
 
-	// Warn if data is below recommended size
 	if len(data) < MinRecommendedSamples && a.verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Warning: data contains less than %d samples\n", MinRecommendedSamples)
 	}
 
-	// Call CGO bridge
 	return calculateIIDEntropy(data, bitsPerSymbol, a.verbose)
 }
 
-// AssessNonIID performs Non-IID entropy assessment
+// AssessNonIID performs a Non-IID entropy assessment using the ten estimators
+// defined in NIST SP 800-90B Section 6.3. A bitsPerSymbol value of 0 triggers
+// auto-detection; valid explicit values are 1 through 8.
 func (a *Assessment) AssessNonIID(data []byte, bitsPerSymbol int) (*Result, error) {
-	// Validate bits per symbol
 	if bitsPerSymbol < 0 || bitsPerSymbol > 8 {
 		return nil, newError("AssessNonIID", ErrInvalidBitsPerSymbol, fmt.Sprintf("got %d", bitsPerSymbol))
 	}
 
-	// Validate data
 	if len(data) == 0 {
 		return nil, newError("AssessNonIID", ErrInvalidData, "data is empty")
 	}
 
-	// Warn if data is below recommended size
 	if len(data) < MinRecommendedSamples && a.verbose > 0 {
 		fmt.Fprintf(os.Stderr, "Warning: data contains less than %d samples\n", MinRecommendedSamples)
 	}
 
-	// Call CGO bridge
 	return calculateNonIIDEntropy(data, bitsPerSymbol, a.verbose)
 }

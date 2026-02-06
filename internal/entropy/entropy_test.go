@@ -13,7 +13,7 @@ import (
 // requires at least 1 million samples and crashes with smaller datasets.
 // These tests would take several minutes to run with proper data sizes.
 
-// errorReader is a mock reader that always returns an error
+// errorReader is a mock io.Reader that always returns an error on Read.
 type errorReader struct{}
 
 func (e *errorReader) Read(p []byte) (n int, err error) {

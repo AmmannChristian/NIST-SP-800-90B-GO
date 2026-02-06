@@ -1,12 +1,16 @@
 //go:build teststub
 
+// This file provides deterministic stub implementations of the CGO-backed
+// entropy calculation functions. It is compiled only when the "teststub" build
+// tag is active, enabling unit tests to run without the C++ library and
+// toolchain. Specific first-byte sentinel values (0xFF, 0xEE) trigger error
+// and edge-case paths for testing purposes.
+
 package entropy
 
 import "math"
 
-// Test stub for CGO-backed functions to allow fast unit testing without the C++ library.
-
-// stubIIDEstimators returns mock IID estimator results
+// stubIIDEstimators returns mock IID estimator results.
 func stubIIDEstimators() []EstimatorResult {
 	return []EstimatorResult{
 		{Name: "Most Common Value", EntropyEstimate: 7.6, Passed: true, IsEntropyValid: true},
@@ -16,7 +20,7 @@ func stubIIDEstimators() []EstimatorResult {
 	}
 }
 
-// stubNonIIDEstimators returns mock Non-IID estimator results
+// stubNonIIDEstimators returns mock Non-IID estimator results.
 func stubNonIIDEstimators() []EstimatorResult {
 	return []EstimatorResult{
 		{Name: "Most Common Value", EntropyEstimate: 6.8, Passed: true, IsEntropyValid: true},

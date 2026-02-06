@@ -13,9 +13,12 @@ import (
 	pb "github.com/AmmannChristian/nist-800-90b/pkg/pb"
 )
 
+// Version is the semantic version of the gRPC assessment service API.
 const Version = "2.0.0"
 
 // GRPCServer implements the Sp80090BAssessmentService gRPC interface.
+// It validates incoming requests, delegates to EntropyService, and records
+// Prometheus metrics for each assessment.
 type GRPCServer struct {
 	pb.UnimplementedSp80090BAssessmentServiceServer
 	svc *EntropyService
@@ -29,6 +32,9 @@ func NewGRPCServer(svc *EntropyService) *GRPCServer {
 }
 
 // AssessEntropy handles gRPC requests for NIST SP 800-90B entropy assessment.
+// It supports IID mode, Non-IID mode, or both simultaneously. The overall
+// min-entropy is the minimum across all enabled modes. If either mode produces
+// an infinity result (no valid estimators), min-entropy falls back to zero.
 func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessmentRequest) (*pb.Sp80090BAssessmentResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
@@ -46,7 +52,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 		return nil, status.Error(codes.InvalidArgument, "either iid_mode or non_iid_mode must be enabled")
 	}
 
-	_ = ctx // requestID no longer needed in response
+	_ = ctx
 	testType := "mixed"
 	if req.IidMode && !req.NonIidMode {
 		testType = "IID"
@@ -111,7 +117,10 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 	}, nil
 }
 
-// convertEstimatorsToProto converts Go estimator results to protobuf messages
+// convertEstimatorsToProto maps internal EstimatorResult values to their
+// protobuf representation. Entropy estimators include the estimate in the
+// details map; statistical tests (where the estimate is not valid) are
+// described as such in the description field.
 func convertEstimatorsToProto(estimators []entropy.EstimatorResult) []*pb.Sp80090BEstimatorResult {
 	if len(estimators) == 0 {
 		return nil

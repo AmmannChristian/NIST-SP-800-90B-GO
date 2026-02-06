@@ -1,3 +1,5 @@
+// Package middleware provides gRPC server interceptors for cross-cutting
+// concerns such as request identification.
 package middleware
 
 import (
@@ -12,7 +14,9 @@ type contextKey string
 
 const requestIDKey contextKey = "request_id"
 
-// UnaryRequestIDInterceptor adds a request ID to the context and response metadata.
+// UnaryRequestIDInterceptor returns a gRPC unary interceptor that generates a
+// UUID v4 request ID, stores it in the context, and sends it back to the client
+// via the "x-request-id" response header.
 func UnaryRequestIDInterceptor() grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
@@ -31,7 +35,8 @@ func UnaryRequestIDInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// GetRequestID returns the request ID from context if available.
+// GetRequestID extracts the request ID from the context. It returns an empty
+// string if no request ID has been set.
 func GetRequestID(ctx context.Context) string {
 	if id, ok := ctx.Value(requestIDKey).(string); ok {
 		return id

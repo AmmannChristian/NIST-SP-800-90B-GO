@@ -1,3 +1,6 @@
+// Package config provides environment-variable-based configuration for the
+// NIST SP 800-90B entropy assessment server. All settings have sensible defaults
+// and are validated at load time.
 package config
 
 import (
@@ -9,7 +12,8 @@ import (
 	"time"
 )
 
-// Config holds the microservice configuration
+// Config holds all runtime parameters for the server, including network
+// addresses, TLS settings, authentication, logging, and resource limits.
 type Config struct {
 	// Server configuration (HTTP metrics/health)
 	ServerPort  int
@@ -44,7 +48,9 @@ type Config struct {
 	AuthJWKSURL  string
 }
 
-// LoadConfig loads configuration from environment variables with defaults
+// LoadConfig reads configuration from environment variables, applies default
+// values for any unset variables, and validates the resulting configuration.
+// It returns an error if validation fails.
 func LoadConfig() (*Config, error) {
 	config := &Config{
 		// Defaults
@@ -75,7 +81,9 @@ func LoadConfig() (*Config, error) {
 	return config, nil
 }
 
-// Validate checks if the configuration is valid
+// Validate checks all configuration invariants, including port ranges, upload
+// size limits, log level validity, and cross-field constraints such as TLS and
+// authentication requiring gRPC to be enabled.
 func (c *Config) Validate() error {
 	if c.ServerPort < 1 || c.ServerPort > 65535 {
 		return fmt.Errorf("invalid server port: %d (must be 1-65535)", c.ServerPort)
@@ -142,8 +150,6 @@ func (c *Config) TLSMinVersionValue() (uint16, error) {
 	return parseTLSMinVersion(c.TLSMinVersion)
 }
 
-// Helper functions to read environment variables
-
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -163,6 +169,9 @@ func getEnvAsInt(key string, defaultValue int) int {
 	return value
 }
 
+// parseTLSClientAuth maps a human-readable string to a tls.ClientAuthType.
+// Accepted values include "none", "request", "requireany", "verifyifgiven",
+// "requireandverify", and "mtls".
 func parseTLSClientAuth(mode string) (tls.ClientAuthType, error) {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "", "none", "noclientcert":
@@ -180,6 +189,8 @@ func parseTLSClientAuth(mode string) (tls.ClientAuthType, error) {
 	}
 }
 
+// parseTLSMinVersion converts a version string (e.g., "1.2", "1.3") into the
+// corresponding crypto/tls constant. Only TLS 1.2 and 1.3 are supported.
 func parseTLSMinVersion(version string) (uint16, error) {
 	switch strings.ToLower(strings.TrimSpace(version)) {
 	case "", "default", "1.2", "tls1.2", "tls12":

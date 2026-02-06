@@ -4,7 +4,8 @@ package nist.sp800_90b.v1;
 
 option go_package = "github.com/AmmannChristian/nist-800-90b/pkg/pb;nistsp80090bv1";
 
-// Service for NIST SP 800-90B entropy assessment
+// Sp80090bAssessmentService exposes NIST SP 800-90B entropy assessment
+// over gRPC. It supports IID and Non-IID test modes on raw sample data.
 service Sp80090bAssessmentService {
   // AssessEntropy performs NIST SP 800-90B entropy assessment on the provided data samples.
   rpc AssessEntropy(Sp80090bAssessmentRequest) returns (Sp80090bAssessmentResponse);

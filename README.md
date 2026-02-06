@@ -131,17 +131,6 @@ make coverage      # deterministic profile + threshold check (90%)
 make cover-html    # open build/coverage.html
 ```
 
-Coverage snapshot (`COVER_PKGS=internal/..., cmd/ea_tool`):
-
-| Package | Coverage |
-|---------|----------|
-| internal/config | 100.0% |
-| internal/metrics | 100.0% |
-| internal/entropy | 86.7% |
-| internal/middleware | 88.9% |
-| internal/service | 84.8% |
-| cmd/ea_tool | 78.9% |
-
 ### Race Detector
 
 ```bash
@@ -196,6 +185,13 @@ Each gRPC request receives a UUID `x-request-id`, is logged with duration, and i
 ### Structured Logging
 
 Zerolog provides structured JSON logs with request IDs, methods, durations, and errors. Control verbosity via `LOG_LEVEL` (`debug`, `info`, `warn`, `error`).
+
+## Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- [Architecture](docs/architecture.md) -- System design, component relationships, CGO bridge design, build architecture, deployment model, and integration with entropy-analytics
+- [API Reference](docs/api-reference.md) -- gRPC service contract, HTTP endpoints, CLI usage, Prometheus metrics, Go package interfaces, and C API specification
 
 ## Attribution and License
 

@@ -34,6 +34,10 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Empty(t, cfg.AuthIssuer)
 	assert.Empty(t, cfg.AuthAudience)
 	assert.Empty(t, cfg.AuthJWKSURL)
+	assert.Equal(t, "jwt", cfg.AuthTokenType)
+	assert.Empty(t, cfg.AuthIntrospectionURL)
+	assert.Empty(t, cfg.AuthIntrospectionClientID)
+	assert.Empty(t, cfg.AuthIntrospectionClientSecret)
 }
 
 func TestLoadConfig_EnvironmentVariables(t *testing.T) {
@@ -58,6 +62,7 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	os.Setenv("AUTH_ISSUER", "https://issuer.example.com")
 	os.Setenv("AUTH_AUDIENCE", "nist-entropy")
 	os.Setenv("AUTH_JWKS_URL", "https://issuer.example.com/jwks.json")
+	os.Setenv("AUTH_TOKEN_TYPE", "jwt")
 
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
@@ -80,6 +85,28 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "https://issuer.example.com", cfg.AuthIssuer)
 	assert.Equal(t, "nist-entropy", cfg.AuthAudience)
 	assert.Equal(t, "https://issuer.example.com/jwks.json", cfg.AuthJWKSURL)
+	assert.Equal(t, "jwt", cfg.AuthTokenType)
+}
+
+func TestLoadConfig_OpaqueAuthEnvironmentVariables(t *testing.T) {
+	clearEnv(t)
+
+	os.Setenv("GRPC_ENABLED", "true")
+	os.Setenv("AUTH_ENABLED", "true")
+	os.Setenv("AUTH_ISSUER", "https://issuer.example.com")
+	os.Setenv("AUTH_AUDIENCE", "nist-entropy")
+	os.Setenv("AUTH_TOKEN_TYPE", "opaque")
+	os.Setenv("AUTH_INTROSPECTION_URL", "https://issuer.example.com/oauth2/introspect")
+	os.Setenv("AUTH_INTROSPECTION_CLIENT_ID", "svc-client")
+	os.Setenv("AUTH_INTROSPECTION_CLIENT_SECRET", "svc-secret")
+
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+
+	assert.Equal(t, "opaque", cfg.AuthTokenType)
+	assert.Equal(t, "https://issuer.example.com/oauth2/introspect", cfg.AuthIntrospectionURL)
+	assert.Equal(t, "svc-client", cfg.AuthIntrospectionClientID)
+	assert.Equal(t, "svc-secret", cfg.AuthIntrospectionClientSecret)
 }
 
 func TestConfig_Validate(t *testing.T) {
@@ -197,6 +224,94 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "auth audience",
+		},
+		{
+			name: "auth enabled invalid token type",
+			cfg: &Config{
+				ServerPort:    8080,
+				GRPCEnabled:   true,
+				GRPCPort:      9090,
+				MaxUploadSize: 1024,
+				LogLevel:      "info",
+				AuthEnabled:   true,
+				AuthIssuer:    "issuer",
+				AuthAudience:  "aud",
+				AuthTokenType: "paseto",
+			},
+			wantErr: true,
+			errMsg:  "AUTH_TOKEN_TYPE",
+		},
+		{
+			name: "auth opaque missing introspection URL",
+			cfg: &Config{
+				ServerPort:                    8080,
+				GRPCEnabled:                   true,
+				GRPCPort:                      9090,
+				MaxUploadSize:                 1024,
+				LogLevel:                      "info",
+				AuthEnabled:                   true,
+				AuthIssuer:                    "issuer",
+				AuthAudience:                  "aud",
+				AuthTokenType:                 "opaque",
+				AuthIntrospectionClientID:     "client",
+				AuthIntrospectionClientSecret: "secret",
+			},
+			wantErr: true,
+			errMsg:  "auth introspection URL",
+		},
+		{
+			name: "auth opaque missing introspection client ID",
+			cfg: &Config{
+				ServerPort:                    8080,
+				GRPCEnabled:                   true,
+				GRPCPort:                      9090,
+				MaxUploadSize:                 1024,
+				LogLevel:                      "info",
+				AuthEnabled:                   true,
+				AuthIssuer:                    "issuer",
+				AuthAudience:                  "aud",
+				AuthTokenType:                 "opaque",
+				AuthIntrospectionURL:          "https://issuer.example.com/oauth2/introspect",
+				AuthIntrospectionClientSecret: "secret",
+			},
+			wantErr: true,
+			errMsg:  "auth introspection client ID",
+		},
+		{
+			name: "auth opaque missing introspection client secret",
+			cfg: &Config{
+				ServerPort:                8080,
+				GRPCEnabled:               true,
+				GRPCPort:                  9090,
+				MaxUploadSize:             1024,
+				LogLevel:                  "info",
+				AuthEnabled:               true,
+				AuthIssuer:                "issuer",
+				AuthAudience:              "aud",
+				AuthTokenType:             "opaque",
+				AuthIntrospectionURL:      "https://issuer.example.com/oauth2/introspect",
+				AuthIntrospectionClientID: "client",
+			},
+			wantErr: true,
+			errMsg:  "auth introspection client secret",
+		},
+		{
+			name: "auth opaque valid introspection config",
+			cfg: &Config{
+				ServerPort:                    8080,
+				GRPCEnabled:                   true,
+				GRPCPort:                      9090,
+				MaxUploadSize:                 1024,
+				LogLevel:                      "info",
+				AuthEnabled:                   true,
+				AuthIssuer:                    "issuer",
+				AuthAudience:                  "aud",
+				AuthTokenType:                 "opaque",
+				AuthIntrospectionURL:          "https://issuer.example.com/oauth2/introspect",
+				AuthIntrospectionClientID:     "client",
+				AuthIntrospectionClientSecret: "secret",
+			},
+			wantErr: false,
 		},
 		{
 			name: "tls enabled without grpc",
@@ -348,6 +463,8 @@ func clearEnv(t *testing.T) {
 		"TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE", "TLS_CA_FILE", "TLS_CLIENT_AUTH", "TLS_MIN_VERSION",
 		"LOG_LEVEL", "MAX_UPLOAD_SIZE", "TIMEOUT", "METRICS_ENABLED",
 		"AUTH_ENABLED", "AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL",
+		"AUTH_TOKEN_TYPE", "AUTH_INTROSPECTION_URL",
+		"AUTH_INTROSPECTION_CLIENT_ID", "AUTH_INTROSPECTION_CLIENT_SECRET",
 	}
 	for _, v := range envVars {
 		os.Unsetenv(v)

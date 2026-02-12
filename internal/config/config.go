@@ -42,10 +42,14 @@ type Config struct {
 	MetricsEnabled bool
 
 	// Authentication
-	AuthEnabled  bool
-	AuthIssuer   string
-	AuthAudience string
-	AuthJWKSURL  string
+	AuthEnabled                   bool
+	AuthIssuer                    string
+	AuthAudience                  string
+	AuthJWKSURL                   string
+	AuthTokenType                 string
+	AuthIntrospectionURL          string
+	AuthIntrospectionClientID     string
+	AuthIntrospectionClientSecret string
 }
 
 // LoadConfig reads configuration from environment variables, applies default
@@ -54,24 +58,28 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	config := &Config{
 		// Defaults
-		ServerPort:     getEnvAsInt("METRICS_PORT", getEnvAsInt("SERVER_PORT", 9091)),
-		ServerHost:     getEnv("SERVER_HOST", "0.0.0.0"),
-		GRPCEnabled:    getEnvAsBool("GRPC_ENABLED", false),
-		GRPCPort:       getEnvAsInt("GRPC_PORT", 9090),
-		TLSEnabled:     getEnvAsBool("TLS_ENABLED", false),
-		TLSCertFile:    getEnv("TLS_CERT_FILE", ""),
-		TLSKeyFile:     getEnv("TLS_KEY_FILE", ""),
-		TLSCAFile:      getEnv("TLS_CA_FILE", ""),
-		TLSClientAuth:  getEnv("TLS_CLIENT_AUTH", "none"),
-		TLSMinVersion:  getEnv("TLS_MIN_VERSION", "1.2"),
-		LogLevel:       getEnv("LOG_LEVEL", "info"),
-		MaxUploadSize:  getEnvAsInt64("MAX_UPLOAD_SIZE", 100*1024*1024), // 100MB default
-		Timeout:        getEnvAsDuration("TIMEOUT", 5*time.Minute),
-		MetricsEnabled: getEnvAsBool("METRICS_ENABLED", true),
-		AuthEnabled:    getEnvAsBool("AUTH_ENABLED", false),
-		AuthIssuer:     getEnv("AUTH_ISSUER", ""),
-		AuthAudience:   getEnv("AUTH_AUDIENCE", ""),
-		AuthJWKSURL:    getEnv("AUTH_JWKS_URL", ""),
+		ServerPort:                    getEnvAsInt("METRICS_PORT", getEnvAsInt("SERVER_PORT", 9091)),
+		ServerHost:                    getEnv("SERVER_HOST", "0.0.0.0"),
+		GRPCEnabled:                   getEnvAsBool("GRPC_ENABLED", false),
+		GRPCPort:                      getEnvAsInt("GRPC_PORT", 9090),
+		TLSEnabled:                    getEnvAsBool("TLS_ENABLED", false),
+		TLSCertFile:                   getEnv("TLS_CERT_FILE", ""),
+		TLSKeyFile:                    getEnv("TLS_KEY_FILE", ""),
+		TLSCAFile:                     getEnv("TLS_CA_FILE", ""),
+		TLSClientAuth:                 getEnv("TLS_CLIENT_AUTH", "none"),
+		TLSMinVersion:                 getEnv("TLS_MIN_VERSION", "1.2"),
+		LogLevel:                      getEnv("LOG_LEVEL", "info"),
+		MaxUploadSize:                 getEnvAsInt64("MAX_UPLOAD_SIZE", 100*1024*1024), // 100MB default
+		Timeout:                       getEnvAsDuration("TIMEOUT", 5*time.Minute),
+		MetricsEnabled:                getEnvAsBool("METRICS_ENABLED", true),
+		AuthEnabled:                   getEnvAsBool("AUTH_ENABLED", false),
+		AuthIssuer:                    getEnv("AUTH_ISSUER", ""),
+		AuthAudience:                  getEnv("AUTH_AUDIENCE", ""),
+		AuthJWKSURL:                   getEnv("AUTH_JWKS_URL", ""),
+		AuthTokenType:                 getEnv("AUTH_TOKEN_TYPE", "jwt"),
+		AuthIntrospectionURL:          getEnv("AUTH_INTROSPECTION_URL", ""),
+		AuthIntrospectionClientID:     getEnv("AUTH_INTROSPECTION_CLIENT_ID", ""),
+		AuthIntrospectionClientSecret: getEnv("AUTH_INTROSPECTION_CLIENT_SECRET", ""),
 	}
 
 	if err := config.Validate(); err != nil {
@@ -116,6 +124,23 @@ func (c *Config) Validate() error {
 		}
 		if c.AuthAudience == "" {
 			return fmt.Errorf("invalid auth audience: required when AUTH_ENABLED=true")
+		}
+		tokenType, err := parseAuthTokenType(c.AuthTokenType)
+		if err != nil {
+			return err
+		}
+		c.AuthTokenType = tokenType
+
+		if c.AuthTokenType == "opaque" {
+			if c.AuthIntrospectionURL == "" {
+				return fmt.Errorf("invalid auth introspection URL: required when AUTH_TOKEN_TYPE=opaque")
+			}
+			if c.AuthIntrospectionClientID == "" {
+				return fmt.Errorf("invalid auth introspection client ID: required when AUTH_TOKEN_TYPE=opaque")
+			}
+			if c.AuthIntrospectionClientSecret == "" {
+				return fmt.Errorf("invalid auth introspection client secret: required when AUTH_TOKEN_TYPE=opaque")
+			}
 		}
 	}
 
@@ -199,6 +224,17 @@ func parseTLSMinVersion(version string) (uint16, error) {
 		return tls.VersionTLS13, nil
 	default:
 		return 0, fmt.Errorf("invalid TLS_MIN_VERSION: %s (use 1.2 or 1.3)", version)
+	}
+}
+
+func parseAuthTokenType(tokenType string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(tokenType)) {
+	case "", "jwt":
+		return "jwt", nil
+	case "opaque":
+		return "opaque", nil
+	default:
+		return "", fmt.Errorf("invalid AUTH_TOKEN_TYPE: %s (use jwt or opaque)", tokenType)
 	}
 }
 

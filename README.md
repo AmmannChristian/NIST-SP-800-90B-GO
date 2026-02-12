@@ -57,9 +57,12 @@ Key environment variables:
 - `TLS_CA_FILE` - Optional CA bundle for client cert verification (mTLS)
 - `TLS_CLIENT_AUTH` - Client auth mode (`none`, `request`, `requireany`, `verifyifgiven`, `requireandverify`; default: `none`)
 - `TLS_MIN_VERSION` - Minimum TLS version (`1.2` or `1.3`; default: `1.2`)
-- `AUTH_ENABLED` - Enable JWT validation for gRPC calls (default: false)
+- `AUTH_ENABLED` - Enable OAuth2/OIDC token validation for gRPC calls (default: false)
 - `AUTH_ISSUER` / `AUTH_AUDIENCE` - Expected issuer and audience (required when auth is enabled)
-- `AUTH_JWKS_URL` - Optional custom JWKS endpoint override
+- `AUTH_TOKEN_TYPE` - Token mode: `jwt` (default) or `opaque`
+- `AUTH_JWKS_URL` - Optional custom JWKS endpoint override (JWT mode)
+- `AUTH_INTROSPECTION_URL` - OAuth2 introspection endpoint (required in opaque mode)
+- `AUTH_INTROSPECTION_CLIENT_ID` / `AUTH_INTROSPECTION_CLIENT_SECRET` - Introspection client credentials (required in opaque mode)
 - `MAX_UPLOAD_SIZE` / `TIMEOUT` / `LOG_LEVEL` - Upload limit, server timeouts, and logging level
 
 ## Usage

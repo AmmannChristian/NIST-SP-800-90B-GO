@@ -164,6 +164,7 @@ func run() error {
 // buildUnaryInterceptors assembles the chain of gRPC unary interceptors. It
 // always includes request ID injection and structured logging. When authentication
 // is enabled, an OIDC token validator is appended with health-check exemptions.
+// Validation supports JWT (JWKS) and opaque tokens (introspection).
 func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, error) {
 	interceptors := []grpc.UnaryServerInterceptor{
 		middleware.UnaryRequestIDInterceptor(),
@@ -175,7 +176,13 @@ func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, 
 	}
 
 	validatorBuilder := grpcserver.NewValidatorBuilder(cfg.AuthIssuer, cfg.AuthAudience)
-	if cfg.AuthJWKSURL != "" {
+	if cfg.AuthTokenType == "opaque" {
+		validatorBuilder = validatorBuilder.WithOpaqueTokenIntrospection(
+			cfg.AuthIntrospectionURL,
+			cfg.AuthIntrospectionClientID,
+			cfg.AuthIntrospectionClientSecret,
+		)
+	} else if cfg.AuthJWKSURL != "" {
 		validatorBuilder = validatorBuilder.WithJWKSURL(cfg.AuthJWKSURL)
 	}
 
@@ -185,9 +192,11 @@ func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, 
 	}
 
 	log.Info().
+		Str("token_type", cfg.AuthTokenType).
 		Str("issuer", cfg.AuthIssuer).
 		Str("audience", cfg.AuthAudience).
 		Str("jwks_url", cfg.AuthJWKSURL).
+		Str("introspection_url", cfg.AuthIntrospectionURL).
 		Msg("gRPC authentication enabled")
 
 	return append(interceptors, grpcserver.UnaryServerInterceptor(

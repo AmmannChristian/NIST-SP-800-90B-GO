@@ -306,10 +306,14 @@ The `internal/config` package provides environment-variable-based configuration 
 | `TLS_CA_FILE` | (empty) | CA bundle for client verification |
 | `TLS_CLIENT_AUTH` | `none` | Client auth mode (none, request, requireany, verifyifgiven, requireandverify, mtls) |
 | `TLS_MIN_VERSION` | `1.2` | Minimum TLS protocol version |
-| `AUTH_ENABLED` | `false` | Enable OIDC JWT validation |
-| `AUTH_ISSUER` | (empty) | Expected JWT issuer |
-| `AUTH_AUDIENCE` | (empty) | Expected JWT audience |
-| `AUTH_JWKS_URL` | (empty) | Custom JWKS endpoint |
+| `AUTH_ENABLED` | `false` | Enable OAuth2/OIDC token validation |
+| `AUTH_ISSUER` | (empty) | Expected token issuer |
+| `AUTH_AUDIENCE` | (empty) | Expected token audience |
+| `AUTH_TOKEN_TYPE` | `jwt` | Token mode (`jwt` or `opaque`) |
+| `AUTH_JWKS_URL` | (empty) | Custom JWKS endpoint (JWT mode) |
+| `AUTH_INTROSPECTION_URL` | (empty) | OAuth2 introspection endpoint (opaque mode) |
+| `AUTH_INTROSPECTION_CLIENT_ID` | (empty) | Introspection client ID (opaque mode) |
+| `AUTH_INTROSPECTION_CLIENT_SECRET` | (empty) | Introspection client secret (opaque mode) |
 | `MAX_UPLOAD_SIZE` | `104857600` | Maximum upload size in bytes (100 MB) |
 | `TIMEOUT` | `5m` | HTTP read/write timeout |
 | `LOG_LEVEL` | `info` | Log verbosity (debug, info, warn, error) |
@@ -345,7 +349,7 @@ The service supports three security mechanisms, all of which are optional and in
 
 **mTLS (Mutual TLS)**: Controlled by `TLS_CLIENT_AUTH`, the server can require clients to present and verify X.509 certificates against a trusted CA bundle specified in `TLS_CA_FILE`.
 
-**OIDC Authentication**: When `AUTH_ENABLED=true`, a JWT validation interceptor is appended to the gRPC interceptor chain. The interceptor uses the `go-authx` library to validate tokens against the configured issuer and audience, with JWKS auto-discovery or a manually specified endpoint. Health check endpoints (`/grpc.health.v1.Health/Check` and `/grpc.health.v1.Health/Watch`) are exempted from authentication.
+**OIDC Authentication**: When `AUTH_ENABLED=true`, a token validation interceptor is appended to the gRPC interceptor chain. In `AUTH_TOKEN_TYPE=jwt` mode, `go-authx` validates JWT access tokens via JWKS auto-discovery or `AUTH_JWKS_URL`. In `AUTH_TOKEN_TYPE=opaque` mode, `go-authx` validates opaque access tokens via RFC 7662 introspection (`AUTH_INTROSPECTION_URL` + client credentials). Health check endpoints (`/grpc.health.v1.Health/Check` and `/grpc.health.v1.Health/Watch`) are exempted from authentication.
 
 ## 5. Build Architecture
 
@@ -484,7 +488,7 @@ The `DataGuard` class in `wrapper.cpp` implements RAII (Resource Acquisition Is 
 | Native Code | C++11 with OpenMP |
 | RPC Framework | gRPC (google.golang.org/grpc v1.78.0) |
 | Protocol Definitions | Protocol Buffers v3 |
-| Authentication | OIDC JWT via go-authx v0.2.0 |
+| Authentication | OIDC JWT + opaque token introspection via go-authx v1.0.1 |
 | Logging | zerolog (structured JSON) |
 | Metrics | Prometheus client_golang v1.23.2 with promauto |
 | Testing | testify, gotestsum, teststub build tag |

@@ -93,6 +93,30 @@ func TestLoggingInterceptor(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestBuildUnaryInterceptors_WithoutAuth(t *testing.T) {
+	cfg := &config.Config{AuthEnabled: false}
+
+	interceptors, err := buildUnaryInterceptors(cfg)
+	require.NoError(t, err)
+	assert.Len(t, interceptors, 2)
+}
+
+func TestBuildUnaryInterceptors_WithOpaqueAuth(t *testing.T) {
+	cfg := &config.Config{
+		AuthEnabled:                   true,
+		AuthIssuer:                    "https://issuer.example.com",
+		AuthAudience:                  "nist-entropy",
+		AuthTokenType:                 "opaque",
+		AuthIntrospectionURL:          "https://issuer.example.com/oauth2/introspect",
+		AuthIntrospectionClientID:     "svc-client",
+		AuthIntrospectionClientSecret: "svc-secret",
+	}
+
+	interceptors, err := buildUnaryInterceptors(cfg)
+	require.NoError(t, err)
+	assert.Len(t, interceptors, 3)
+}
+
 func TestRunFailsOnBadConfig(t *testing.T) {
 	// Invalid port should cause config validation failure
 	os.Setenv("SERVER_PORT", "-1")

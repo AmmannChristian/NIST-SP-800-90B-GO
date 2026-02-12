@@ -166,6 +166,25 @@ func TestBuildUnaryInterceptors_WithOpaqueAuthPrivateKeyJWTZitadelJSON(t *testin
 	assert.Len(t, interceptors, 3)
 }
 
+func TestBuildAuthorizationPolicy(t *testing.T) {
+	cfg := &config.Config{
+		AuthzRequiredRoles:   []string{"NIST_ROLE"},
+		AuthzRequiredScopes:  []string{"openid", "profile"},
+		AuthzRoleMatchMode:   "all",
+		AuthzScopeMatchMode:  "any",
+		AuthzRoleClaimPaths:  []string{"roles", "realm_access.roles"},
+		AuthzScopeClaimPaths: []string{"scope", "scp"},
+	}
+
+	policy := buildAuthorizationPolicy(cfg)
+	assert.Equal(t, []string{"NIST_ROLE"}, policy.RequiredRoles)
+	assert.Equal(t, []string{"openid", "profile"}, policy.RequiredScopes)
+	assert.Equal(t, "all", string(policy.RoleMatchMode))
+	assert.Equal(t, "any", string(policy.ScopeMatchMode))
+	assert.Equal(t, []string{"roles", "realm_access.roles"}, policy.RoleClaimPaths)
+	assert.Equal(t, []string{"scope", "scp"}, policy.ScopeClaimPaths)
+}
+
 func TestRunFailsOnBadConfig(t *testing.T) {
 	// Invalid port should cause config validation failure
 	os.Setenv("SERVER_PORT", "-1")

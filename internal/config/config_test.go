@@ -43,6 +43,12 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Empty(t, cfg.AuthIntrospectionPrivateKeyFile)
 	assert.Empty(t, cfg.AuthIntrospectionPrivateKeyJWTKeyID)
 	assert.Empty(t, cfg.AuthIntrospectionPrivateKeyJWTAlgorithm)
+	assert.Empty(t, cfg.AuthzRequiredRoles)
+	assert.Empty(t, cfg.AuthzRequiredScopes)
+	assert.Equal(t, "any", cfg.AuthzRoleMatchMode)
+	assert.Equal(t, "any", cfg.AuthzScopeMatchMode)
+	assert.Empty(t, cfg.AuthzRoleClaimPaths)
+	assert.Empty(t, cfg.AuthzScopeClaimPaths)
 }
 
 func TestLoadConfig_EnvironmentVariables(t *testing.T) {
@@ -68,6 +74,12 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	os.Setenv("AUTH_AUDIENCE", "nist-entropy")
 	os.Setenv("AUTH_JWKS_URL", "https://issuer.example.com/jwks.json")
 	os.Setenv("AUTH_TOKEN_TYPE", "jwt")
+	os.Setenv("AUTHZ_REQUIRED_ROLES", "NIST_ROLE, entropy-admin ")
+	os.Setenv("AUTHZ_REQUIRED_SCOPES", "openid, profile")
+	os.Setenv("AUTHZ_ROLE_MATCH_MODE", "all")
+	os.Setenv("AUTHZ_SCOPE_MATCH_MODE", "any")
+	os.Setenv("AUTHZ_ROLE_CLAIM_PATHS", "roles,urn:zitadel:iam:org:project:roles")
+	os.Setenv("AUTHZ_SCOPE_CLAIM_PATHS", "scope,scp")
 
 	cfg, err := LoadConfig()
 	require.NoError(t, err)
@@ -91,6 +103,12 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "nist-entropy", cfg.AuthAudience)
 	assert.Equal(t, "https://issuer.example.com/jwks.json", cfg.AuthJWKSURL)
 	assert.Equal(t, "jwt", cfg.AuthTokenType)
+	assert.Equal(t, []string{"NIST_ROLE", "entropy-admin"}, cfg.AuthzRequiredRoles)
+	assert.Equal(t, []string{"openid", "profile"}, cfg.AuthzRequiredScopes)
+	assert.Equal(t, "all", cfg.AuthzRoleMatchMode)
+	assert.Equal(t, "any", cfg.AuthzScopeMatchMode)
+	assert.Equal(t, []string{"roles", "urn:zitadel:iam:org:project:roles"}, cfg.AuthzRoleClaimPaths)
+	assert.Equal(t, []string{"scope", "scp"}, cfg.AuthzScopeClaimPaths)
 }
 
 func TestLoadConfig_OpaqueAuthEnvironmentVariables(t *testing.T) {
@@ -468,6 +486,32 @@ func TestConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "authz invalid role match mode",
+			cfg: &Config{
+				ServerPort:         8080,
+				GRPCEnabled:        true,
+				GRPCPort:           9090,
+				MaxUploadSize:      1024,
+				LogLevel:           "info",
+				AuthzRoleMatchMode: "one",
+			},
+			wantErr: true,
+			errMsg:  "AUTHZ_ROLE_MATCH_MODE",
+		},
+		{
+			name: "authz invalid scope match mode",
+			cfg: &Config{
+				ServerPort:          8080,
+				GRPCEnabled:         true,
+				GRPCPort:            9090,
+				MaxUploadSize:       1024,
+				LogLevel:            "info",
+				AuthzScopeMatchMode: "one",
+			},
+			wantErr: true,
+			errMsg:  "AUTHZ_SCOPE_MATCH_MODE",
+		},
+		{
 			name: "tls enabled without grpc",
 			cfg: &Config{
 				ServerPort:    8080,
@@ -622,6 +666,8 @@ func clearEnv(t *testing.T) {
 		"AUTH_INTROSPECTION_AUTH_METHOD",
 		"AUTH_INTROSPECTION_PRIVATE_KEY", "AUTH_INTROSPECTION_PRIVATE_KEY_FILE",
 		"AUTH_INTROSPECTION_PRIVATE_KEY_JWT_KID", "AUTH_INTROSPECTION_PRIVATE_KEY_JWT_ALG",
+		"AUTHZ_REQUIRED_ROLES", "AUTHZ_REQUIRED_SCOPES", "AUTHZ_ROLE_MATCH_MODE", "AUTHZ_SCOPE_MATCH_MODE",
+		"AUTHZ_ROLE_CLAIM_PATHS", "AUTHZ_SCOPE_CLAIM_PATHS",
 	}
 	for _, v := range envVars {
 		os.Unsetenv(v)

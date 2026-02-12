@@ -214,13 +214,52 @@ func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, 
 		Str("introspection_auth_method", cfg.AuthIntrospectionAuthMethod).
 		Msg("gRPC authentication enabled")
 
-	return append(interceptors, grpcserver.UnaryServerInterceptor(
-		validator,
+	policy := buildAuthorizationPolicy(cfg)
+	interceptorOptions := []grpcserver.InterceptorOption{
+		grpcserver.WithAuthorizationPolicy(policy),
 		grpcserver.WithExemptMethods(
 			"/grpc.health.v1.Health/Check",
 			"/grpc.health.v1.Health/Watch",
 		),
-	)), nil
+	}
+
+	if authorizationEnabled(cfg) {
+		log.Info().
+			Strs("required_roles", cfg.AuthzRequiredRoles).
+			Strs("required_scopes", cfg.AuthzRequiredScopes).
+			Str("role_match_mode", cfg.AuthzRoleMatchMode).
+			Str("scope_match_mode", cfg.AuthzScopeMatchMode).
+			Strs("role_claim_paths", cfg.AuthzRoleClaimPaths).
+			Strs("scope_claim_paths", cfg.AuthzScopeClaimPaths).
+			Msg("gRPC authorization enabled")
+	}
+
+	return append(interceptors, grpcserver.UnaryServerInterceptor(validator, interceptorOptions...)), nil
+}
+
+func buildAuthorizationPolicy(cfg *config.Config) grpcserver.AuthorizationPolicy {
+	roleMatchMode := grpcserver.RoleMatchModeAny
+	if cfg.AuthzRoleMatchMode == "all" {
+		roleMatchMode = grpcserver.RoleMatchModeAll
+	}
+
+	scopeMatchMode := grpcserver.ScopeMatchModeAny
+	if cfg.AuthzScopeMatchMode == "all" {
+		scopeMatchMode = grpcserver.ScopeMatchModeAll
+	}
+
+	return grpcserver.AuthorizationPolicy{
+		RequiredRoles:   cfg.AuthzRequiredRoles,
+		RequiredScopes:  cfg.AuthzRequiredScopes,
+		RoleMatchMode:   roleMatchMode,
+		ScopeMatchMode:  scopeMatchMode,
+		RoleClaimPaths:  cfg.AuthzRoleClaimPaths,
+		ScopeClaimPaths: cfg.AuthzScopeClaimPaths,
+	}
+}
+
+func authorizationEnabled(cfg *config.Config) bool {
+	return len(cfg.AuthzRequiredRoles) > 0 || len(cfg.AuthzRequiredScopes) > 0
 }
 
 // buildGRPCServerOptions constructs gRPC server options from the provided

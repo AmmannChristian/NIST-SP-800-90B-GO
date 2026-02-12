@@ -68,6 +68,9 @@ Key environment variables:
 - `AUTH_INTROSPECTION_PRIVATE_KEY_FILE` - Alternative file path for `AUTH_INTROSPECTION_PRIVATE_KEY` (mutually exclusive)
 - `AUTH_INTROSPECTION_PRIVATE_KEY_JWT_KID` - Optional JWT header `kid` override for `private_key_jwt`
 - `AUTH_INTROSPECTION_PRIVATE_KEY_JWT_ALG` - Optional signing alg override (`RS256` or `ES256`)
+- `AUTHZ_REQUIRED_ROLES` / `AUTHZ_REQUIRED_SCOPES` - Optional required roles/scopes (comma-separated); enables authorization checks when set
+- `AUTHZ_ROLE_MATCH_MODE` / `AUTHZ_SCOPE_MATCH_MODE` - Matching mode for required roles/scopes (`any` or `all`; default: `any`)
+- `AUTHZ_ROLE_CLAIM_PATHS` / `AUTHZ_SCOPE_CLAIM_PATHS` - Optional claim paths (comma-separated, dot-notation supported) used for role/scope extraction
 - `MAX_UPLOAD_SIZE` / `TIMEOUT` / `LOG_LEVEL` - Upload limit, server timeouts, and logging level
 
 ZITADEL `private_key_jwt` examples:

@@ -47,3 +47,4 @@ experiments/
 build
 .env
 .cache
+.gocache

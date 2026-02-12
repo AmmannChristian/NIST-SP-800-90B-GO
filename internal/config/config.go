@@ -42,14 +42,19 @@ type Config struct {
 	MetricsEnabled bool
 
 	// Authentication
-	AuthEnabled                   bool
-	AuthIssuer                    string
-	AuthAudience                  string
-	AuthJWKSURL                   string
-	AuthTokenType                 string
-	AuthIntrospectionURL          string
-	AuthIntrospectionClientID     string
-	AuthIntrospectionClientSecret string
+	AuthEnabled                             bool
+	AuthIssuer                              string
+	AuthAudience                            string
+	AuthJWKSURL                             string
+	AuthTokenType                           string
+	AuthIntrospectionURL                    string
+	AuthIntrospectionAuthMethod             string
+	AuthIntrospectionClientID               string
+	AuthIntrospectionClientSecret           string
+	AuthIntrospectionPrivateKey             string
+	AuthIntrospectionPrivateKeyFile         string
+	AuthIntrospectionPrivateKeyJWTKeyID     string
+	AuthIntrospectionPrivateKeyJWTAlgorithm string
 }
 
 // LoadConfig reads configuration from environment variables, applies default
@@ -58,28 +63,33 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	config := &Config{
 		// Defaults
-		ServerPort:                    getEnvAsInt("METRICS_PORT", getEnvAsInt("SERVER_PORT", 9091)),
-		ServerHost:                    getEnv("SERVER_HOST", "0.0.0.0"),
-		GRPCEnabled:                   getEnvAsBool("GRPC_ENABLED", false),
-		GRPCPort:                      getEnvAsInt("GRPC_PORT", 9090),
-		TLSEnabled:                    getEnvAsBool("TLS_ENABLED", false),
-		TLSCertFile:                   getEnv("TLS_CERT_FILE", ""),
-		TLSKeyFile:                    getEnv("TLS_KEY_FILE", ""),
-		TLSCAFile:                     getEnv("TLS_CA_FILE", ""),
-		TLSClientAuth:                 getEnv("TLS_CLIENT_AUTH", "none"),
-		TLSMinVersion:                 getEnv("TLS_MIN_VERSION", "1.2"),
-		LogLevel:                      getEnv("LOG_LEVEL", "info"),
-		MaxUploadSize:                 getEnvAsInt64("MAX_UPLOAD_SIZE", 100*1024*1024), // 100MB default
-		Timeout:                       getEnvAsDuration("TIMEOUT", 5*time.Minute),
-		MetricsEnabled:                getEnvAsBool("METRICS_ENABLED", true),
-		AuthEnabled:                   getEnvAsBool("AUTH_ENABLED", false),
-		AuthIssuer:                    getEnv("AUTH_ISSUER", ""),
-		AuthAudience:                  getEnv("AUTH_AUDIENCE", ""),
-		AuthJWKSURL:                   getEnv("AUTH_JWKS_URL", ""),
-		AuthTokenType:                 getEnv("AUTH_TOKEN_TYPE", "jwt"),
-		AuthIntrospectionURL:          getEnv("AUTH_INTROSPECTION_URL", ""),
-		AuthIntrospectionClientID:     getEnv("AUTH_INTROSPECTION_CLIENT_ID", ""),
-		AuthIntrospectionClientSecret: getEnv("AUTH_INTROSPECTION_CLIENT_SECRET", ""),
+		ServerPort:                              getEnvAsInt("METRICS_PORT", getEnvAsInt("SERVER_PORT", 9091)),
+		ServerHost:                              getEnv("SERVER_HOST", "0.0.0.0"),
+		GRPCEnabled:                             getEnvAsBool("GRPC_ENABLED", false),
+		GRPCPort:                                getEnvAsInt("GRPC_PORT", 9090),
+		TLSEnabled:                              getEnvAsBool("TLS_ENABLED", false),
+		TLSCertFile:                             getEnv("TLS_CERT_FILE", ""),
+		TLSKeyFile:                              getEnv("TLS_KEY_FILE", ""),
+		TLSCAFile:                               getEnv("TLS_CA_FILE", ""),
+		TLSClientAuth:                           getEnv("TLS_CLIENT_AUTH", "none"),
+		TLSMinVersion:                           getEnv("TLS_MIN_VERSION", "1.2"),
+		LogLevel:                                getEnv("LOG_LEVEL", "info"),
+		MaxUploadSize:                           getEnvAsInt64("MAX_UPLOAD_SIZE", 100*1024*1024), // 100MB default
+		Timeout:                                 getEnvAsDuration("TIMEOUT", 5*time.Minute),
+		MetricsEnabled:                          getEnvAsBool("METRICS_ENABLED", true),
+		AuthEnabled:                             getEnvAsBool("AUTH_ENABLED", false),
+		AuthIssuer:                              getEnv("AUTH_ISSUER", ""),
+		AuthAudience:                            getEnv("AUTH_AUDIENCE", ""),
+		AuthJWKSURL:                             getEnv("AUTH_JWKS_URL", ""),
+		AuthTokenType:                           getEnv("AUTH_TOKEN_TYPE", "jwt"),
+		AuthIntrospectionURL:                    getEnv("AUTH_INTROSPECTION_URL", ""),
+		AuthIntrospectionAuthMethod:             getEnv("AUTH_INTROSPECTION_AUTH_METHOD", "client_secret_basic"),
+		AuthIntrospectionClientID:               getEnv("AUTH_INTROSPECTION_CLIENT_ID", ""),
+		AuthIntrospectionClientSecret:           getEnv("AUTH_INTROSPECTION_CLIENT_SECRET", ""),
+		AuthIntrospectionPrivateKey:             getEnv("AUTH_INTROSPECTION_PRIVATE_KEY", ""),
+		AuthIntrospectionPrivateKeyFile:         getEnv("AUTH_INTROSPECTION_PRIVATE_KEY_FILE", ""),
+		AuthIntrospectionPrivateKeyJWTKeyID:     getEnv("AUTH_INTROSPECTION_PRIVATE_KEY_JWT_KID", ""),
+		AuthIntrospectionPrivateKeyJWTAlgorithm: getEnv("AUTH_INTROSPECTION_PRIVATE_KEY_JWT_ALG", ""),
 	}
 
 	if err := config.Validate(); err != nil {
@@ -135,11 +145,44 @@ func (c *Config) Validate() error {
 			if c.AuthIntrospectionURL == "" {
 				return fmt.Errorf("invalid auth introspection URL: required when AUTH_TOKEN_TYPE=opaque")
 			}
-			if c.AuthIntrospectionClientID == "" {
-				return fmt.Errorf("invalid auth introspection client ID: required when AUTH_TOKEN_TYPE=opaque")
+			authMethod, err := parseAuthIntrospectionAuthMethod(c.AuthIntrospectionAuthMethod)
+			if err != nil {
+				return err
 			}
-			if c.AuthIntrospectionClientSecret == "" {
-				return fmt.Errorf("invalid auth introspection client secret: required when AUTH_TOKEN_TYPE=opaque")
+			c.AuthIntrospectionAuthMethod = authMethod
+
+			switch c.AuthIntrospectionAuthMethod {
+			case "client_secret_basic":
+				if c.AuthIntrospectionClientID == "" {
+					return fmt.Errorf("invalid auth introspection client ID: required when AUTH_INTROSPECTION_AUTH_METHOD=client_secret_basic")
+				}
+				if c.AuthIntrospectionClientSecret == "" {
+					return fmt.Errorf("invalid auth introspection client secret: required when AUTH_INTROSPECTION_AUTH_METHOD=client_secret_basic")
+				}
+			case "private_key_jwt":
+				c.AuthIntrospectionPrivateKey = strings.TrimSpace(c.AuthIntrospectionPrivateKey)
+				c.AuthIntrospectionPrivateKeyFile = strings.TrimSpace(c.AuthIntrospectionPrivateKeyFile)
+				if c.AuthIntrospectionPrivateKey != "" && c.AuthIntrospectionPrivateKeyFile != "" {
+					return fmt.Errorf("invalid auth introspection private key config: AUTH_INTROSPECTION_PRIVATE_KEY and AUTH_INTROSPECTION_PRIVATE_KEY_FILE are mutually exclusive")
+				}
+				if c.AuthIntrospectionPrivateKey == "" && c.AuthIntrospectionPrivateKeyFile == "" {
+					return fmt.Errorf("invalid auth introspection private key: required when AUTH_INTROSPECTION_AUTH_METHOD=private_key_jwt")
+				}
+				if c.AuthIntrospectionPrivateKeyFile != "" {
+					privateKeyBytes, readErr := os.ReadFile(c.AuthIntrospectionPrivateKeyFile)
+					if readErr != nil {
+						return fmt.Errorf("invalid auth introspection private key file: %w", readErr)
+					}
+					c.AuthIntrospectionPrivateKey = strings.TrimSpace(string(privateKeyBytes))
+					if c.AuthIntrospectionPrivateKey == "" {
+						return fmt.Errorf("invalid auth introspection private key file: empty file")
+					}
+				}
+				privateKeyJWTAlgorithm, parseErr := parseAuthIntrospectionPrivateKeyJWTAlgorithm(c.AuthIntrospectionPrivateKeyJWTAlgorithm)
+				if parseErr != nil {
+					return parseErr
+				}
+				c.AuthIntrospectionPrivateKeyJWTAlgorithm = privateKeyJWTAlgorithm
 			}
 		}
 	}
@@ -235,6 +278,26 @@ func parseAuthTokenType(tokenType string) (string, error) {
 		return "opaque", nil
 	default:
 		return "", fmt.Errorf("invalid AUTH_TOKEN_TYPE: %s (use jwt or opaque)", tokenType)
+	}
+}
+
+func parseAuthIntrospectionAuthMethod(method string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(method)) {
+	case "", "client_secret_basic":
+		return "client_secret_basic", nil
+	case "private_key_jwt":
+		return "private_key_jwt", nil
+	default:
+		return "", fmt.Errorf("invalid AUTH_INTROSPECTION_AUTH_METHOD: %s (use client_secret_basic or private_key_jwt)", method)
+	}
+}
+
+func parseAuthIntrospectionPrivateKeyJWTAlgorithm(algorithm string) (string, error) {
+	switch strings.ToUpper(strings.TrimSpace(algorithm)) {
+	case "", "RS256", "ES256":
+		return strings.ToUpper(strings.TrimSpace(algorithm)), nil
+	default:
+		return "", fmt.Errorf("invalid AUTH_INTROSPECTION_PRIVATE_KEY_JWT_ALG: %s (use RS256 or ES256)", algorithm)
 	}
 }
 

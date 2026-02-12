@@ -177,11 +177,25 @@ func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, 
 
 	validatorBuilder := grpcserver.NewValidatorBuilder(cfg.AuthIssuer, cfg.AuthAudience)
 	if cfg.AuthTokenType == "opaque" {
-		validatorBuilder = validatorBuilder.WithOpaqueTokenIntrospection(
-			cfg.AuthIntrospectionURL,
-			cfg.AuthIntrospectionClientID,
-			cfg.AuthIntrospectionClientSecret,
-		)
+		if cfg.AuthIntrospectionAuthMethod == "private_key_jwt" {
+			authConfig := grpcserver.IntrospectionClientAuthConfig{
+				Method:                 grpcserver.IntrospectionClientAuthMethodPrivateKeyJWT,
+				ClientID:               cfg.AuthIntrospectionClientID,
+				PrivateKey:             cfg.AuthIntrospectionPrivateKey,
+				PrivateKeyJWTKeyID:     cfg.AuthIntrospectionPrivateKeyJWTKeyID,
+				PrivateKeyJWTAlgorithm: cfg.AuthIntrospectionPrivateKeyJWTAlgorithm,
+			}
+			validatorBuilder = validatorBuilder.WithOpaqueTokenIntrospectionAuth(
+				cfg.AuthIntrospectionURL,
+				authConfig,
+			)
+		} else {
+			validatorBuilder = validatorBuilder.WithOpaqueTokenIntrospection(
+				cfg.AuthIntrospectionURL,
+				cfg.AuthIntrospectionClientID,
+				cfg.AuthIntrospectionClientSecret,
+			)
+		}
 	} else if cfg.AuthJWKSURL != "" {
 		validatorBuilder = validatorBuilder.WithJWKSURL(cfg.AuthJWKSURL)
 	}
@@ -197,6 +211,7 @@ func buildUnaryInterceptors(cfg *config.Config) ([]grpc.UnaryServerInterceptor, 
 		Str("audience", cfg.AuthAudience).
 		Str("jwks_url", cfg.AuthJWKSURL).
 		Str("introspection_url", cfg.AuthIntrospectionURL).
+		Str("introspection_auth_method", cfg.AuthIntrospectionAuthMethod).
 		Msg("gRPC authentication enabled")
 
 	return append(interceptors, grpcserver.UnaryServerInterceptor(

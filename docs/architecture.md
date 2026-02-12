@@ -312,8 +312,13 @@ The `internal/config` package provides environment-variable-based configuration 
 | `AUTH_TOKEN_TYPE` | `jwt` | Token mode (`jwt` or `opaque`) |
 | `AUTH_JWKS_URL` | (empty) | Custom JWKS endpoint (JWT mode) |
 | `AUTH_INTROSPECTION_URL` | (empty) | OAuth2 introspection endpoint (opaque mode) |
-| `AUTH_INTROSPECTION_CLIENT_ID` | (empty) | Introspection client ID (opaque mode) |
-| `AUTH_INTROSPECTION_CLIENT_SECRET` | (empty) | Introspection client secret (opaque mode) |
+| `AUTH_INTROSPECTION_AUTH_METHOD` | `client_secret_basic` | Introspection client auth method (`client_secret_basic` or `private_key_jwt`) |
+| `AUTH_INTROSPECTION_CLIENT_ID` | (empty) | Introspection client ID (`client_secret_basic`; optional for Zitadel key JSON with `private_key_jwt`) |
+| `AUTH_INTROSPECTION_CLIENT_SECRET` | (empty) | Introspection client secret (`client_secret_basic`) |
+| `AUTH_INTROSPECTION_PRIVATE_KEY` | (empty) | Introspection private key content for `private_key_jwt` (PEM, JWK JSON, or Zitadel key JSON) |
+| `AUTH_INTROSPECTION_PRIVATE_KEY_FILE` | (empty) | File path alternative for `AUTH_INTROSPECTION_PRIVATE_KEY` |
+| `AUTH_INTROSPECTION_PRIVATE_KEY_JWT_KID` | (empty) | Optional `kid` override for `private_key_jwt` assertions |
+| `AUTH_INTROSPECTION_PRIVATE_KEY_JWT_ALG` | (empty) | Optional assertion signing algorithm (`RS256` or `ES256`) |
 | `MAX_UPLOAD_SIZE` | `104857600` | Maximum upload size in bytes (100 MB) |
 | `TIMEOUT` | `5m` | HTTP read/write timeout |
 | `LOG_LEVEL` | `info` | Log verbosity (debug, info, warn, error) |
@@ -349,7 +354,7 @@ The service supports three security mechanisms, all of which are optional and in
 
 **mTLS (Mutual TLS)**: Controlled by `TLS_CLIENT_AUTH`, the server can require clients to present and verify X.509 certificates against a trusted CA bundle specified in `TLS_CA_FILE`.
 
-**OIDC Authentication**: When `AUTH_ENABLED=true`, a token validation interceptor is appended to the gRPC interceptor chain. In `AUTH_TOKEN_TYPE=jwt` mode, `go-authx` validates JWT access tokens via JWKS auto-discovery or `AUTH_JWKS_URL`. In `AUTH_TOKEN_TYPE=opaque` mode, `go-authx` validates opaque access tokens via RFC 7662 introspection (`AUTH_INTROSPECTION_URL` + client credentials). Health check endpoints (`/grpc.health.v1.Health/Check` and `/grpc.health.v1.Health/Watch`) are exempted from authentication.
+**OIDC Authentication**: When `AUTH_ENABLED=true`, a token validation interceptor is appended to the gRPC interceptor chain. In `AUTH_TOKEN_TYPE=jwt` mode, `go-authx` validates JWT access tokens via JWKS auto-discovery or `AUTH_JWKS_URL`. In `AUTH_TOKEN_TYPE=opaque` mode, `go-authx` validates opaque access tokens via RFC 7662 introspection (`AUTH_INTROSPECTION_URL`). Introspection client authentication supports both `client_secret_basic` and RFC 7523 `private_key_jwt` (PEM/JWK/Zitadel key JSON). Health check endpoints (`/grpc.health.v1.Health/Check` and `/grpc.health.v1.Health/Watch`) are exempted from authentication.
 
 ## 5. Build Architecture
 
@@ -488,7 +493,7 @@ The `DataGuard` class in `wrapper.cpp` implements RAII (Resource Acquisition Is 
 | Native Code | C++11 with OpenMP |
 | RPC Framework | gRPC (google.golang.org/grpc v1.78.0) |
 | Protocol Definitions | Protocol Buffers v3 |
-| Authentication | OIDC JWT + opaque token introspection via go-authx v1.0.1 |
+| Authentication | OIDC JWT + opaque token introspection (client_secret_basic/private_key_jwt) via go-authx v1.1.0 |
 | Logging | zerolog (structured JSON) |
 | Metrics | Prometheus client_golang v1.23.2 with promauto |
 | Testing | testify, gotestsum, teststub build tag |

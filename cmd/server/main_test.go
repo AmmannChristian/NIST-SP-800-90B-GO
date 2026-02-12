@@ -2,6 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -117,6 +122,50 @@ func TestBuildUnaryInterceptors_WithOpaqueAuth(t *testing.T) {
 	assert.Len(t, interceptors, 3)
 }
 
+func TestBuildUnaryInterceptors_WithOpaqueAuthPrivateKeyJWTPEM(t *testing.T) {
+	cfg := &config.Config{
+		AuthEnabled:                             true,
+		AuthIssuer:                              "https://issuer.example.com",
+		AuthAudience:                            "nist-entropy",
+		AuthTokenType:                           "opaque",
+		AuthIntrospectionURL:                    "https://issuer.example.com/oauth2/introspect",
+		AuthIntrospectionAuthMethod:             "private_key_jwt",
+		AuthIntrospectionClientID:               "svc-client",
+		AuthIntrospectionPrivateKey:             mustGenerateRSAPrivateKeyPEM(t),
+		AuthIntrospectionPrivateKeyJWTKeyID:     "kid-1",
+		AuthIntrospectionPrivateKeyJWTAlgorithm: "RS256",
+	}
+
+	interceptors, err := buildUnaryInterceptors(cfg)
+	require.NoError(t, err)
+	assert.Len(t, interceptors, 3)
+}
+
+func TestBuildUnaryInterceptors_WithOpaqueAuthPrivateKeyJWTZitadelJSON(t *testing.T) {
+	privateKeyPEM := mustGenerateRSAPrivateKeyPEM(t)
+	zitadelEnvelope := map[string]string{
+		"keyId":    "zitadel-kid",
+		"clientId": "svc-client",
+		"key":      privateKeyPEM,
+	}
+	zitadelKeyJSONBytes, err := json.Marshal(zitadelEnvelope)
+	require.NoError(t, err)
+
+	cfg := &config.Config{
+		AuthEnabled:                 true,
+		AuthIssuer:                  "https://issuer.example.com",
+		AuthAudience:                "nist-entropy",
+		AuthTokenType:               "opaque",
+		AuthIntrospectionURL:        "https://issuer.example.com/oauth2/introspect",
+		AuthIntrospectionAuthMethod: "private_key_jwt",
+		AuthIntrospectionPrivateKey: string(zitadelKeyJSONBytes),
+	}
+
+	interceptors, err := buildUnaryInterceptors(cfg)
+	require.NoError(t, err)
+	assert.Len(t, interceptors, 3)
+}
+
 func TestRunFailsOnBadConfig(t *testing.T) {
 	// Invalid port should cause config validation failure
 	os.Setenv("SERVER_PORT", "-1")
@@ -212,4 +261,21 @@ func mustListen(t *testing.T) net.Listener {
 		t.Skipf("cannot listen on tcp :0: %v", err)
 	}
 	return ln
+}
+
+func mustGenerateRSAPrivateKeyPEM(t *testing.T) string {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	privateKeyDER, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	require.NoError(t, err)
+
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyDER,
+	})
+
+	return string(privateKeyPEM)
 }

@@ -190,7 +190,7 @@ Zerolog provides structured JSON logs with request IDs, methods, durations, and 
 
 Detailed documentation is available in the `docs/` directory:
 
-- [Architecture](docs/architecture.md) -- System design, component relationships, CGO bridge design, build architecture, deployment model, and integration with entropy-analytics
+- [Architecture](docs/architecture.md) -- System design, component relationships, CGO bridge design, build architecture, deployment model, and integration with entropy-processor
 - [API Reference](docs/api-reference.md) -- gRPC service contract, HTTP endpoints, CLI usage, Prometheus metrics, Go package interfaces, and C API specification
 
 ## Attribution and License

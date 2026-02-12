@@ -4,7 +4,7 @@
 
 The NIST SP 800-90B service is a Go microservice that provides entropy assessment capabilities in accordance with NIST Special Publication 800-90B, "Recommendation for the Entropy Sources Used for Random Bit Generation." The service wraps the official NIST C++ reference implementation (SP800-90B_EntropyAssessment, version 1.1.8) through a CGO bridge, exposing its functionality via both a command-line interface and a gRPC API with Prometheus-based observability.
 
-Within the broader high-entropy-api system, this service functions as a dedicated assessment endpoint. The `entropy-analytics` Quarkus microservice invokes this service over gRPC to evaluate the min-entropy of entropy source samples collected from hardware noise sources. The proto contract shared between the two services ensures interoperability across the Go and Java language boundaries.
+Within the broader high-entropy-api system, this service functions as a dedicated assessment endpoint. The `entropy-processor` Quarkus microservice invokes this service over gRPC to evaluate the min-entropy of entropy source samples collected from hardware noise sources. The proto contract shared between the two services ensures interoperability across the Go and Java language boundaries.
 
 The service implements two assessment modes defined by NIST SP 800-90B:
 
@@ -18,7 +18,7 @@ The following diagram illustrates the primary components and their relationships
 ```mermaid
 graph TB
     subgraph External Clients
-        EA["entropy-analytics<br/>(Quarkus / Java)"]
+        EA["entropy-processor<br/>(Quarkus / Java)"]
         CLI_USER["CLI User"]
     end
 
@@ -414,14 +414,14 @@ graph TB
 | `nist-prometheus` | `prom/prometheus:latest` | 9092 | Metrics collection (30-day retention) |
 | `nist-grafana` | `grafana/grafana:latest` | 3000 | Dashboard visualization |
 
-## 7. Integration with entropy-analytics
+## 7. Integration with entropy-processor
 
-The `entropy-analytics` Quarkus service consumes this service over gRPC using a mirror of the same proto definition. The proto files share identical message structures and field numbers:
+The `entropy-processor` Quarkus service consumes this service over gRPC using a mirror of the same proto definition. The proto files share identical message structures and field numbers:
 
 | Proto Location | Language Options | Package |
 |---|---|---|
 | `external/nist-sp-800-90b/api/nist/v1/nist_sp800_90b.proto` | `go_package` | `nist.sp800_90b.v1` |
-| `entropy-analytics/src/main/proto/nist_sp800_90b.proto` | `java_package`, `java_multiple_files`, `java_outer_classname` | `nist.sp800_90b.v1` |
+| `entropy-processor/src/main/proto/nist_sp800_90b.proto` | `java_package`, `java_multiple_files`, `java_outer_classname` | `nist.sp800_90b.v1` |
 
 Both definitions declare the same `Sp80090bAssessmentService` with a single `AssessEntropy` RPC, ensuring wire-level compatibility. The Java-side proto includes Java-specific generation options (`java_package = "com.ammann.entropyanalytics.grpc.proto.sp80090b"`), while the Go-side proto specifies the Go package path.
 

@@ -179,12 +179,13 @@ jobs:
 
       - name: Publish test report
         if: always() && steps.junit_check.outputs.available == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        continue-on-error: true
         uses: dorny/test-reporter@v1
         with:
           name: SP800-90B Tests
           path: build-ci/test-junit/junit.xml
           reporter: java-junit
-          token: ${{ secrets.GITHUB_TOKEN }}
+          only-summary: true
           fail-on-error: false
 
       - name: Upload coverage and test artifacts

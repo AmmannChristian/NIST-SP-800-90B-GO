@@ -12,14 +12,18 @@ import (
 	"time"
 )
 
+const defaultGRPCMaxMessageSize = 10 * 1024 * 1024
+
 // Config holds all runtime parameters for the server, including network
 // addresses, TLS settings, authentication, logging, and resource limits.
 type Config struct {
 	// Server configuration (HTTP metrics/health)
-	ServerPort  int
-	ServerHost  string
-	GRPCEnabled bool
-	GRPCPort    int
+	ServerPort             int
+	ServerHost             string
+	GRPCEnabled            bool
+	GRPCPort               int
+	GRPCMaxRecvMessageSize int
+	GRPCMaxSendMessageSize int
 
 	// TLS for gRPC
 	TLSEnabled    bool
@@ -73,6 +77,8 @@ func LoadConfig() (*Config, error) {
 		ServerHost:                              getEnv("SERVER_HOST", "0.0.0.0"),
 		GRPCEnabled:                             getEnvAsBool("GRPC_ENABLED", false),
 		GRPCPort:                                getEnvAsInt("GRPC_PORT", 9090),
+		GRPCMaxRecvMessageSize:                  getEnvAsInt("GRPC_MAX_RECV_MESSAGE_SIZE", defaultGRPCMaxMessageSize),
+		GRPCMaxSendMessageSize:                  getEnvAsInt("GRPC_MAX_SEND_MESSAGE_SIZE", defaultGRPCMaxMessageSize),
 		TLSEnabled:                              getEnvAsBool("TLS_ENABLED", false),
 		TLSCertFile:                             getEnv("TLS_CERT_FILE", ""),
 		TLSKeyFile:                              getEnv("TLS_KEY_FILE", ""),
@@ -121,6 +127,18 @@ func (c *Config) Validate() error {
 
 	if c.GRPCEnabled && (c.GRPCPort < 1 || c.GRPCPort > 65535) {
 		return fmt.Errorf("invalid gRPC port: %d (must be 1-65535)", c.GRPCPort)
+	}
+	if c.GRPCMaxRecvMessageSize < 0 {
+		return fmt.Errorf("invalid GRPC_MAX_RECV_MESSAGE_SIZE: %d (must be >= 0)", c.GRPCMaxRecvMessageSize)
+	}
+	if c.GRPCMaxSendMessageSize < 0 {
+		return fmt.Errorf("invalid GRPC_MAX_SEND_MESSAGE_SIZE: %d (must be >= 0)", c.GRPCMaxSendMessageSize)
+	}
+	if c.GRPCMaxRecvMessageSize == 0 {
+		c.GRPCMaxRecvMessageSize = defaultGRPCMaxMessageSize
+	}
+	if c.GRPCMaxSendMessageSize == 0 {
+		c.GRPCMaxSendMessageSize = defaultGRPCMaxMessageSize
 	}
 
 	if c.MaxUploadSize < 1024 {

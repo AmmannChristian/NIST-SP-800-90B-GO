@@ -64,6 +64,8 @@ func run() error {
 		Str("version", version).
 		Int("metrics_port", cfg.ServerPort).
 		Int("grpc_port", cfg.GRPCPort).
+		Int("grpc_max_recv_message_size", cfg.GRPCMaxRecvMessageSize).
+		Int("grpc_max_send_message_size", cfg.GRPCMaxSendMessageSize).
 		Bool("grpc_enabled", cfg.GRPCEnabled).
 		Bool("auth_enabled", cfg.AuthEnabled).
 		Int64("max_upload_bytes", cfg.MaxUploadSize).
@@ -266,8 +268,19 @@ func authorizationEnabled(cfg *config.Config) bool {
 // configuration. When TLS is enabled, it loads certificates and configures
 // client authentication and minimum protocol version.
 func buildGRPCServerOptions(cfg *config.Config, unaryInterceptors []grpc.UnaryServerInterceptor) ([]grpc.ServerOption, error) {
+	maxRecvMessageSize := cfg.GRPCMaxRecvMessageSize
+	if maxRecvMessageSize <= 0 {
+		maxRecvMessageSize = 10 * 1024 * 1024
+	}
+	maxSendMessageSize := cfg.GRPCMaxSendMessageSize
+	if maxSendMessageSize <= 0 {
+		maxSendMessageSize = 10 * 1024 * 1024
+	}
+
 	opts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(unaryInterceptors...),
+		grpc.MaxRecvMsgSize(maxRecvMessageSize),
+		grpc.MaxSendMsgSize(maxSendMessageSize),
 	}
 
 	if !cfg.TLSEnabled {

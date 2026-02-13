@@ -20,6 +20,8 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Equal(t, "0.0.0.0", cfg.ServerHost)
 	assert.False(t, cfg.GRPCEnabled)
 	assert.Equal(t, 9090, cfg.GRPCPort)
+	assert.Equal(t, 10*1024*1024, cfg.GRPCMaxRecvMessageSize)
+	assert.Equal(t, 10*1024*1024, cfg.GRPCMaxSendMessageSize)
 	assert.False(t, cfg.TLSEnabled)
 	assert.Empty(t, cfg.TLSCertFile)
 	assert.Empty(t, cfg.TLSKeyFile)
@@ -59,6 +61,8 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	os.Setenv("SERVER_HOST", "127.0.0.1")
 	os.Setenv("GRPC_ENABLED", "true")
 	os.Setenv("GRPC_PORT", "50051")
+	os.Setenv("GRPC_MAX_RECV_MESSAGE_SIZE", "12582912")
+	os.Setenv("GRPC_MAX_SEND_MESSAGE_SIZE", "12582912")
 	os.Setenv("TLS_ENABLED", "true")
 	os.Setenv("TLS_CERT_FILE", "/tmp/server.crt")
 	os.Setenv("TLS_KEY_FILE", "/tmp/server.key")
@@ -88,6 +92,8 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "127.0.0.1", cfg.ServerHost)
 	assert.True(t, cfg.GRPCEnabled)
 	assert.Equal(t, 50051, cfg.GRPCPort)
+	assert.Equal(t, 12582912, cfg.GRPCMaxRecvMessageSize)
+	assert.Equal(t, 12582912, cfg.GRPCMaxSendMessageSize)
 	assert.True(t, cfg.TLSEnabled)
 	assert.Equal(t, "/tmp/server.crt", cfg.TLSCertFile)
 	assert.Equal(t, "/tmp/server.key", cfg.TLSKeyFile)
@@ -232,6 +238,32 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "invalid gRPC port",
+		},
+		{
+			name: "invalid gRPC max receive message size",
+			cfg: &Config{
+				ServerPort:             8080,
+				GRPCEnabled:            true,
+				GRPCPort:               9090,
+				GRPCMaxRecvMessageSize: -1,
+				MaxUploadSize:          1024,
+				LogLevel:               "info",
+			},
+			wantErr: true,
+			errMsg:  "GRPC_MAX_RECV_MESSAGE_SIZE",
+		},
+		{
+			name: "invalid gRPC max send message size",
+			cfg: &Config{
+				ServerPort:             8080,
+				GRPCEnabled:            true,
+				GRPCPort:               9090,
+				GRPCMaxSendMessageSize: -1,
+				MaxUploadSize:          1024,
+				LogLevel:               "info",
+			},
+			wantErr: true,
+			errMsg:  "GRPC_MAX_SEND_MESSAGE_SIZE",
 		},
 		{
 			name: "invalid max upload size",
@@ -657,7 +689,7 @@ func TestLoadConfig_ValidationFailure(t *testing.T) {
 func clearEnv(t *testing.T) {
 	t.Helper()
 	envVars := []string{
-		"SERVER_PORT", "SERVER_HOST", "GRPC_ENABLED", "GRPC_PORT", "METRICS_PORT",
+		"SERVER_PORT", "SERVER_HOST", "GRPC_ENABLED", "GRPC_PORT", "GRPC_MAX_RECV_MESSAGE_SIZE", "GRPC_MAX_SEND_MESSAGE_SIZE", "METRICS_PORT",
 		"TLS_ENABLED", "TLS_CERT_FILE", "TLS_KEY_FILE", "TLS_CA_FILE", "TLS_CLIENT_AUTH", "TLS_MIN_VERSION",
 		"LOG_LEVEL", "MAX_UPLOAD_SIZE", "TIMEOUT", "METRICS_ENABLED",
 		"AUTH_ENABLED", "AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL",

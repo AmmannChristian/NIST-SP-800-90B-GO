@@ -5,11 +5,13 @@ import (
 	"math"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/AmmannChristian/nist-800-90b/internal/entropy"
 	"github.com/AmmannChristian/nist-800-90b/internal/metrics"
+	"github.com/AmmannChristian/nist-800-90b/internal/middleware"
 	pb "github.com/AmmannChristian/nist-800-90b/pkg/pb"
 )
 
@@ -36,23 +38,45 @@ func NewGRPCServer(svc *EntropyService) *GRPCServer {
 // min-entropy is the minimum across all enabled modes. If either mode produces
 // an infinity result (no valid estimators), min-entropy falls back to zero.
 func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessmentRequest) (*pb.Sp80090BAssessmentResponse, error) {
+	requestID := middleware.GetRequestID(ctx)
+
 	if req == nil {
+		log.Error().
+			Str("request_id", requestID).
+			Msg("AssessEntropy request validation failed: request cannot be nil")
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
 
+	log.Info().
+		Str("request_id", requestID).
+		Int("sample_count", len(req.Data)).
+		Uint32("bits_per_symbol", req.BitsPerSymbol).
+		Bool("iid_mode", req.IidMode).
+		Bool("non_iid_mode", req.NonIidMode).
+		Msg("AssessEntropy request received")
+
 	if len(req.Data) == 0 {
+		log.Error().
+			Str("request_id", requestID).
+			Msg("AssessEntropy request validation failed: data cannot be empty")
 		return nil, status.Error(codes.InvalidArgument, "data cannot be empty")
 	}
 
 	if req.BitsPerSymbol > 8 {
+		log.Error().
+			Str("request_id", requestID).
+			Uint32("bits_per_symbol", req.BitsPerSymbol).
+			Msg("AssessEntropy request validation failed: bits_per_symbol out of range")
 		return nil, status.Errorf(codes.InvalidArgument, "bits_per_symbol must be between 0 and 8, got %d", req.BitsPerSymbol)
 	}
 
 	if !req.IidMode && !req.NonIidMode {
+		log.Error().
+			Str("request_id", requestID).
+			Msg("AssessEntropy request validation failed: no assessment mode selected")
 		return nil, status.Error(codes.InvalidArgument, "either iid_mode or non_iid_mode must be enabled")
 	}
 
-	_ = ctx
 	testType := "mixed"
 	if req.IidMode && !req.NonIidMode {
 		testType = "IID"
@@ -106,7 +130,7 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 	}
 	metrics.RecordDuration(testType, time.Since(startTime).Seconds())
 
-	return &pb.Sp80090BAssessmentResponse{
+	response := &pb.Sp80090BAssessmentResponse{
 		MinEntropy:        minEntropy,
 		IidResults:        iidResults,
 		NonIidResults:     nonIIDResults,
@@ -114,7 +138,17 @@ func (s *GRPCServer) AssessEntropy(ctx context.Context, req *pb.Sp80090BAssessme
 		AssessmentSummary: "NIST SP 800-90B entropy assessment completed",
 		SampleCount:       uint64(len(req.Data)),
 		BitsPerSymbol:     usedBits,
-	}, nil
+	}
+
+	log.Info().
+		Str("request_id", requestID).
+		Int64("execution_time_ms", time.Since(startTime).Milliseconds()).
+		Float64("min_entropy", response.MinEntropy).
+		Int("iid_results_count", len(response.IidResults)).
+		Int("non_iid_results_count", len(response.NonIidResults)).
+		Msg("AssessEntropy completed successfully")
+
+	return response, nil
 }
 
 // convertEstimatorsToProto maps internal EstimatorResult values to their

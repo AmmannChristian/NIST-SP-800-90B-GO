@@ -4,7 +4,7 @@
 
 The NIST SP 800-90B service is a Go microservice that provides entropy assessment capabilities in accordance with NIST Special Publication 800-90B, "Recommendation for the Entropy Sources Used for Random Bit Generation." The service wraps the official NIST C++ reference implementation (SP800-90B_EntropyAssessment, version 1.1.8) through a CGO bridge, exposing its functionality via both a command-line interface and a gRPC API with Prometheus-based observability.
 
-Within the broader high-entropy-api system, this service functions as a dedicated assessment endpoint. The `entropy-processor` Quarkus microservice invokes this service over gRPC to evaluate the min-entropy of entropy source samples collected from hardware noise sources. The proto contract shared between the two services ensures interoperability across the Go and Java language boundaries.
+Within the broader decay-entropy-stream system, this service functions as a dedicated assessment endpoint. The `entropy-processor` Quarkus microservice invokes this service over gRPC to evaluate the min-entropy of entropy source samples collected from hardware noise sources. The proto contract shared between the two services ensures interoperability across the Go and Java language boundaries.
 
 The service implements two assessment modes defined by NIST SP 800-90B:
 
